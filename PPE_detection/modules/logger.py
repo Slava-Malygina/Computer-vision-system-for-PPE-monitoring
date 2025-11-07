@@ -1,3 +1,4 @@
+import gc
 import os
 import csv
 from datetime import datetime
@@ -5,17 +6,7 @@ import logging
 
 
 class ViolationLogger:
-    """
-    Класс для ведения журнала нарушений в реальном времени.
-    Периодически пишет нарушения в csv файл. Для каждой новой сессии создается новый файл.
-    Добавляет нарушения с одного кадра в буфер или сразу в файл.
-        frame_id: уникальный идентификатор кадра
-        violations_list: список нарушений для кадра
-         (должен содержать ключи: 'тип_нарушения', 'вероятность_нарушения')
-        screenshot_path: путь к скриншоту
-    """
-
-    def __init__(self, output_dir='logs', filename=None, max_buffer_size=100):
+    def __init__(self, output_dir='logs', filename=None, max_buffer_size=50):
         self.output_dir = output_dir
         self.max_buffer_size = max_buffer_size
         self.buffer = []
@@ -37,8 +28,8 @@ class ViolationLogger:
         self.file_path = os.path.join(output_dir, filename)
 
         try:
-            self.fields = self.fields = ['дата', 'frame_id', 'human_id', 'время_обработки', 'тип_нарушения',
-                                         'вероятность_нарушения', 'путь_к_скриншоту']
+            self.fields = ['date', 'frame_id', 'human_id', 'processing_time', 'violation_type',
+                           'violation_probability', 'screenshot_path']
             with open(self.file_path, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.DictWriter(f, fieldnames=self.fields)
                 writer.writeheader()
@@ -49,7 +40,6 @@ class ViolationLogger:
             raise
 
     def _setup_logging(self):
-        """Настройка логирования для класса."""
         logger = logging.getLogger(f"ViolationLogger_{id(self)}")
         if not logger.handlers:
             handler = logging.StreamHandler()
@@ -62,7 +52,6 @@ class ViolationLogger:
         return logger
 
     def _get_current_time(self):
-        """Быстрое получение текущего времени с миллисекундами."""
         now = datetime.now()
         current_date = now.strftime('%Y-%m-%d')
         if current_date != self.current_date:
@@ -72,25 +61,6 @@ class ViolationLogger:
         return now.strftime('%H:%M:%S.%f')[:-3]
 
     def add_frame_violations(self, frame_id: int, violations_dict: dict, screenshot_path: str = None):
-        """
-        Добавляет нарушения для конкретного кадра.
-
-        violations_dict — структура:
-        {
-            "human_1": [
-                {"тип_нарушения": "нет_каски", "вероятность": 0.93},
-                {"тип_нарушения": "нет_жилета", "вероятность": 0.82}
-            ],
-            "human_2": [
-                {"тип_нарушения": "нет_перчаток", "вероятность": 0.88}
-            ]
-        }
-        """
-
-        self.logger.debug(
-            f"[DEBUG] frame_id={frame_id}, type={type(violations_dict)}, keys={list(violations_dict.keys())
-            if isinstance(violations_dict, dict) else 'N/A'}")
-
         try:
             if not violations_dict or not isinstance(violations_dict, dict):
                 self.logger.warning(f"Пустые или некорректные данные нарушений для frame_id={frame_id}")
@@ -103,52 +73,44 @@ class ViolationLogger:
 
                 for v in human_violations:
                     self.buffer.append({
-                        "дата": self.current_date,
+                        "date": self.current_date,
                         "frame_id": frame_id,
-                        "время_обработки": self._get_current_time(),
-                        "тип_нарушения": v.get('тип_нарушения', 'неизвестно'),
-                        "вероятность_нарушения": v.get("вероятность", 0.0),
-                        "путь_к_скриншоту": screenshot_path or '',
+                        "processing_time": self._get_current_time(),
+                        "violation_type": v.get('violation_type', 'unknown'),
+                        "violation_probability": v.get("probability", 0.0),
+                        "screenshot_path": screenshot_path or '',
                         "human_id": human_id
                     })
-                    self.logger.info(f"[Frame {frame_id}] {human_id}: {v['тип_нарушения']} "
-                                     f"(вероятность {v['вероятность']})")
+                    self.logger.info(f"[Frame {frame_id}] {human_id}: {v['violation_type']} "
+                                     f"(вероятность {v['probability']})")
+
             if len(self.buffer) >= self.max_buffer_size:
                 self.flush()
 
         except Exception as e:
-            self.logger.error(f"Ошибка добавления нарушений для frame_id {frame_id}: {e}")
+            self.logger.error(f"Error adding violations for frame_id {frame_id}: {e}")
 
     def _flush_buffer(self):
-        """Записывает буфер в файл."""
         if not self.buffer:
             return True
         try:
             with open(self.file_path, 'a', newline='', encoding='utf-8') as f:
                 writer = csv.DictWriter(f, fieldnames=self.fields)
                 writer.writerows(self.buffer)
-
             self.logger.debug(f"Записано {len(self.buffer)} записей в файл")
             self.buffer.clear()
+            gc.collect()
             return True
 
         except (IOError, PermissionError, csv.Error) as e:
             self.logger.error(f"Ошибка записи буфера в файл: {e}")
             return False
 
-    def _validate_entry(self, entry):
-        """Быстрая валидация записи."""
-        try:
-            return (entry['frame_id'] is not None and
-                    entry['дата'] and
-                    entry['тип_нарушения'] and
-                    0.0 <= entry['вероятность_нарушения'] <= 1.0)
-        except (KeyError, TypeError):
-            return False
-
     def flush(self):
-        """Принудительная запись буфера в файл."""
         return self._flush_buffer()
+
+    def get_file_path(self):
+        return self.file_path
 
     def read_log(self, limit=None):
         """Чтение лога с диска."""

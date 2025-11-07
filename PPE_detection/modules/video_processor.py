@@ -6,7 +6,7 @@ import numpy as np
 from ultralytics import YOLO
 from deep_sort_realtime.deepsort_tracker import DeepSort
 
-from modules.violation_detector import ViolationDetector
+from PPE_detection.modules.violation_detector import ViolationDetector
 
 
 def _iou(boxA, boxB):
