@@ -37,7 +37,6 @@ def get_model_path():
 def _is_inside(small_box, big_box, threshold=0.5):
     x1, y1, x2, y2 = small_box
     bx1, by1, bx2, by2 = big_box
-
     inter_x1 = max(x1, bx1)
     inter_y1 = max(y1, by1)
     inter_x2 = min(x2, bx2)
@@ -47,7 +46,6 @@ def _is_inside(small_box, big_box, threshold=0.5):
     small_area = (x2 - x1) * (y2 - y1)
     if small_area == 0:
         return False
-
     return (inter_area / small_area) >= threshold
 
 def _iou(boxA, boxB):
@@ -714,7 +712,7 @@ class MainWindow(QMainWindow):
                 model_name = os.path.basename(model_path)
                 self.model_label.setText(f"Model: {model_name}")
             else:
-                self.model = YOLO('yolov8n.pt')
+                self.model = YOLO('yolo11n.pt')
                 self.model_label.setText("Model: YOLOv8n (Demo)")
                 
         except Exception as e:

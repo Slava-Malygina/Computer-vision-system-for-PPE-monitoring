@@ -1,5 +1,5 @@
+
 def _is_inside(small_box, big_box, threshold=0.5):
-    """Проверка, сколько процентов маленького бокса находится внутри большого"""
     x1, y1, x2, y2 = small_box
     bx1, by1, bx2, by2 = big_box
 
@@ -15,9 +15,7 @@ def _is_inside(small_box, big_box, threshold=0.5):
 
     return (inter_area / small_area) >= threshold
 
-
 def _iou(boxA, boxB):
-    """Вычисляет IoU между двумя боксами"""
     x_a = max(boxA[0], boxB[0])
     y_a = max(boxA[1], boxB[1])
     x_b = min(boxA[2], boxB[2])
@@ -36,22 +34,17 @@ class ViolationDetector:
             'gloves': 0.3,
             'head': 0.5,
             'body': 0.6,
-            'palm': 0.5
+            'palm': 0.5,
+            'wrist': 0.4
         }
 
         self.recorded_violations = {}
 
     def clear_recorded_violations(self):
-        """Очистить историю нарушений"""
         self.recorded_violations.clear()
 
     def process_frame(self, detections, tracked_objects, frame_id):
-        """
-        detections: список детекций YOLO [{'cls':'helmet','bbox':[x1,y1,x2,y2],'conf':0.88}, ...]
-        tracked_objects: список треков [(x1, y1, x2, y2, id), ...]
-        frame_id: номер кадра
-        """
-        violations = {}
+
         new_violations = {}
 
         objects_by_class = {}
@@ -68,26 +61,23 @@ class ViolationDetector:
 
         for x1, y1, x2, y2, track_id in tracked_objects:
             person_box = [x1, y1, x2, y2]
-            person_violations = []
             new_person_violations = []
 
             recorded_for_track = self.recorded_violations.get(track_id, set())
 
             head_found = [h for h in heads if _is_inside(h['bbox'], person_box, self.overlap_thresholds['head'])]
-            helmet_found = [h for h in helmets if
-                            _is_inside(h['bbox'], person_box, self.overlap_thresholds['helmet'])]
+            helmet_found = [h for h in helmets if _is_inside(h['bbox'], person_box, self.overlap_thresholds['helmet'])]
 
             if head_found:
                 head_conf = max(h['conf'] for h in head_found)
                 helmet_conf = max((h['conf'] for h in helmet_found), default=0)
 
                 if not helmet_found or (head_conf > helmet_conf):
-                    violation_type = 'нет_каски'
+                    violation_type = 'no_helmet'
                     probability = round(head_conf, 2)
-                    person_violations.append({'тип_нарушения': violation_type, 'вероятность': probability})
 
                     if violation_type not in recorded_for_track:
-                        new_person_violations.append({'тип_нарушения': violation_type, 'вероятность': probability})
+                        new_person_violations.append({'violation_type': violation_type, 'probability': probability})
                         if track_id not in self.recorded_violations:
                             self.recorded_violations[track_id] = set()
                         self.recorded_violations[track_id].add(violation_type)
@@ -100,38 +90,31 @@ class ViolationDetector:
                 vest_conf = max((v['conf'] for v in vest_found), default=0)
 
                 if not vest_found or (body_conf > vest_conf):
-                    violation_type = 'нет_жилета'
+                    violation_type = 'no_vest'
                     probability = round(body_conf, 2)
-                    person_violations.append({'тип_нарушения': violation_type, 'вероятность': probability})
 
                     if violation_type not in recorded_for_track:
-                        new_person_violations.append({'тип_нарушения': violation_type, 'вероятность': probability})
+                        new_person_violations.append({'violation_type': violation_type, 'probability': probability})
                         if track_id not in self.recorded_violations:
                             self.recorded_violations[track_id] = set()
                         self.recorded_violations[track_id].add(violation_type)
 
-            palm_found = [w for w in palms if
-                          _is_inside(w['bbox'], person_box, self.overlap_thresholds['palm'])]
-            glove_found = [g for g in gloves if
-                           _is_inside(g['bbox'], person_box, self.overlap_thresholds['gloves'])]
+            palm_found = [w for w in palms if _is_inside(w['bbox'], person_box, self.overlap_thresholds['palm'])]
+            glove_found = [g for g in gloves if _is_inside(g['bbox'], person_box, self.overlap_thresholds['gloves'])]
 
             if palm_found:
                 palm_conf = max(w['conf'] for w in palm_found)
                 glove_conf = max((g['conf'] for g in glove_found), default=0)
 
                 if not glove_found or (palm_conf > glove_conf):
-                    violation_type = 'нет_перчаток'
+                    violation_type = 'no_gloves'
                     probability = round(palm_conf, 2)
-                    person_violations.append({'тип_нарушения': violation_type, 'вероятность': probability})
 
                     if violation_type not in recorded_for_track:
-                        new_person_violations.append({'тип_нарушения': violation_type, 'вероятность': probability})
+                        new_person_violations.append({'violation_type': violation_type, 'probability': probability})
                         if track_id not in self.recorded_violations:
                             self.recorded_violations[track_id] = set()
                         self.recorded_violations[track_id].add(violation_type)
-
-            if person_violations:
-                violations[f'human_{int(track_id)}'] = person_violations
 
             if new_person_violations:
                 new_violations[f'human_{int(track_id)}'] = new_person_violations

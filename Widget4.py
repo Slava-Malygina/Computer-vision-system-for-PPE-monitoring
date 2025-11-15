@@ -20,7 +20,7 @@ import gc
 
 def get_model_path():
     possible_paths = [
-        "best.pt",
+        "best_V6.pt",
         "model/best.pt", 
         "resources/best.pt",
         os.path.join(os.path.dirname(__file__), "best.pt"),
