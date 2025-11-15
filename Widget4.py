@@ -20,7 +20,7 @@ import gc
 
 def get_model_path():
     possible_paths = [
-        "best.pt",
+        "best_V6.pt",
         "model/best.pt", 
         "resources/best.pt",
         os.path.join(os.path.dirname(__file__), "best.pt"),
@@ -37,6 +37,7 @@ def get_model_path():
 def _is_inside(small_box, big_box, threshold=0.5):
     x1, y1, x2, y2 = small_box
     bx1, by1, bx2, by2 = big_box
+
     inter_x1 = max(x1, bx1)
     inter_y1 = max(y1, by1)
     inter_x2 = min(x2, bx2)
@@ -46,6 +47,7 @@ def _is_inside(small_box, big_box, threshold=0.5):
     small_area = (x2 - x1) * (y2 - y1)
     if small_area == 0:
         return False
+
     return (inter_area / small_area) >= threshold
 
 def _iou(boxA, boxB):
@@ -256,6 +258,41 @@ class ViolationDetector:
             'screenshot_path': None
         }
 
+class DetectionThread(QThread):
+    detection_done = pyqtSignal(object, object, object, object)
+    
+    def __init__(self, model, frame, conf_threshold, frame_counter):
+        super().__init__()
+        self.model = model
+        self.frame = frame
+        self.conf_threshold = conf_threshold
+        self.frame_counter = frame_counter
+        
+    def run(self):
+        try:
+            results = self.model(self.frame, 
+                               conf=self.conf_threshold,
+                               verbose=False,
+                               imgsz=640)
+            
+            detections = []
+            if len(results) > 0 and results[0].boxes is not None:
+                for box in results[0].boxes:
+                    cls = int(box.cls[0])
+                    conf = float(box.conf[0])
+                    class_name = self.model.names[cls]
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    
+                    detections.append({
+                        'cls': class_name,
+                        'bbox': [x1, y1, x2, y2],
+                        'conf': conf
+                    })
+            
+            self.detection_done.emit(detections, self.frame, self.frame_counter, results)
+        except Exception as e:
+            print(f"Detection error: {e}")
+
 class VideoThread(QThread):
     frame_ready = pyqtSignal(object)
     status_update = pyqtSignal(str)
@@ -276,19 +313,21 @@ class VideoThread(QThread):
         
         try:
             if self.source_type == 'camera':
-                self.cap = cv2.VideoCapture(int(self.source_path))
+                self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
                 self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                 self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
                 self.cap.set(cv2.CAP_PROP_FPS, 15)
-                self.status_update.emit(f"Camera {self.source_path} connected")
+                self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                
+                if not self.cap.isOpened():
+                    self.status_update.emit("Cannot open device camera")
+                    return
+                
+                self.status_update.emit("Device camera connected")
             else:
                 self.cap = cv2.VideoCapture(self.source_path)
                 self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
                 self.status_update.emit(f"Video loaded: {os.path.basename(self.source_path)}")
-            
-            if not self.cap.isOpened():
-                self.status_update.emit(f"Cannot open {self.source_type}")
-                return
             
             while self.is_running:
                 ret, frame = self.cap.read()
@@ -298,7 +337,11 @@ class VideoThread(QThread):
                         self.finished_signal.emit()
                     break
                 
-                small_frame = cv2.resize(frame, (640, 480))
+                if self.source_type == 'camera':
+                    small_frame = frame
+                else:
+                    small_frame = cv2.resize(frame, (640, 480))
+                    
                 self.frame_ready.emit(small_frame)
                 
                 if self.source_type == 'video':
@@ -306,7 +349,7 @@ class VideoThread(QThread):
                     progress = int((self.current_frame / self.total_frames) * 100)
                     self.progress_update.emit(progress)
                 
-                time.sleep(0.067 if self.source_type == 'camera' else 0.033)
+                time.sleep(0.033)
                 
         except Exception as e:
             self.status_update.emit(f"Error: {str(e)}")
@@ -324,17 +367,19 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.model = None
         self.video_thread = None
+        self.detection_thread = None
         self.current_frame = None
         self.is_detecting = False
         self.violations_log = []
         self.available_cameras = []
         self.violation_detector = ViolationDetector()
         self.violation_logger = ViolationLogger()
-        self.tracked_objects = []
+        self.track_history = []
         self.frame_counter = 0
         self.processing_frame = False
         self.last_detection_time = 0
         self.detection_interval = 0.5
+        self.next_track_id = 0
         
         self.last_detections = []
         self.last_tracks = []
@@ -682,37 +727,19 @@ class MainWindow(QMainWindow):
         self.last_fps_time = time.time()
         
     def detect_cameras(self):
-        print("Scanning for available cameras...")
-        self.available_cameras = []
-        
-        for i in range(3):
-            cap = cv2.VideoCapture(i)
-            if cap.isOpened():
-                ret, frame = cap.read()
-                if ret:
-                    self.available_cameras.append(i)
-                    self.camera_combo.addItem(f"Camera {i}", i)
-                cap.release()
-                del cap
-                gc.collect()
-        
-        if not self.available_cameras:
-            self.camera_combo.addItem("No cameras found", -1)
+        self.camera_combo.addItem("Device Camera", 0)
+        self.available_cameras = [0]
             
     def load_model(self):
         try:
             model_path = get_model_path()
             
             if model_path and os.path.exists(model_path):
-                if hasattr(self, 'model'):
-                    del self.model
-                gc.collect()
-                
                 self.model = YOLO(model_path)
                 model_name = os.path.basename(model_path)
                 self.model_label.setText(f"Model: {model_name}")
             else:
-                self.model = YOLO('yolo11n.pt')
+                self.model = YOLO('yolov8n.pt')
                 self.model_label.setText("Model: YOLOv8n (Demo)")
                 
         except Exception as e:
@@ -733,13 +760,7 @@ class MainWindow(QMainWindow):
         source_type = self.source_combo.currentData()
         
         if source_type == "camera":
-            if not self.available_cameras:
-                QMessageBox.warning(self, "Warning", "No cameras available!")
-                return
-            source_path = self.camera_combo.currentData()
-            if source_path == -1:
-                QMessageBox.warning(self, "Warning", "No valid camera selected!")
-                return
+            source_path = 0
         else:
             if not hasattr(self, 'current_video_path') or not self.current_video_path:
                 QMessageBox.warning(self, "Warning", "Please select a video file first!")
@@ -770,7 +791,10 @@ class MainWindow(QMainWindow):
     def stop_video(self):
         if self.video_thread and self.video_thread.isRunning():
             self.video_thread.stop()
-            self.video_thread.wait(2000)
+            self.video_thread.wait(1000)
+            
+        if self.detection_thread and self.detection_thread.isRunning():
+            self.detection_thread.wait(1000)
             
         self.display_timer.stop()
         
@@ -785,7 +809,6 @@ class MainWindow(QMainWindow):
         self.progress_bar.setVisible(False)
         
         self.current_frame = None
-        gc.collect()
         
     def on_video_finished(self):
         self.stop_video()
@@ -818,84 +841,156 @@ class MainWindow(QMainWindow):
                 self.last_detection_time = current_time
                 self.processing_frame = True
                 
-                try:
-                    processed_frame, violations, detections, tracks = self.process_frame_with_detection(frame)
-                    self.last_detections = detections
-                    self.last_tracks = tracks
-                    
-                    for violation in violations:
-                        self.add_violation(violation)
-                        
-                except Exception as e:
-                    print(f"Detection error: {e}")
-                finally:
-                    self.processing_frame = False
-                    gc.collect()
-                
-    def process_frame_with_detection(self, frame):
-        violations = []
-        processed_frame = frame.copy()
-        detections = []
-        tracks = []
-        
-        try:
-            detection_frame = cv2.resize(frame, (640, 480))
-            
-            results = self.model(detection_frame, 
-                               conf=self.conf_slider.value()/100.0, 
-                               verbose=False,
-                               imgsz=640)
-            
-            if len(results) > 0 and results[0].boxes is not None:
-                scale_x = frame.shape[1] / detection_frame.shape[1]
-                scale_y = frame.shape[0] / detection_frame.shape[0]
-                
-                for box in results[0].boxes:
-                    cls = int(box.cls[0])
-                    conf = float(box.conf[0])
-                    class_name = self.model.names[cls]
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    
-                    x1 = int(x1 * scale_x)
-                    y1 = int(y1 * scale_y)
-                    x2 = int(x2 * scale_x)
-                    y2 = int(y2 * scale_y)
-                    
-                    detections.append({
-                        'cls': class_name,
-                        'bbox': [x1, y1, x2, y2],
-                        'conf': conf
-                    })
-                
-                self.frame_counter += 1
-                tracks = self.simple_tracking(detections)
-                self.tracked_objects = tracks
-                
-                result = self.violation_detector.process_frame(
-                    detections, tracks, self.frame_counter
+                self.detection_thread = DetectionThread(
+                    self.model, frame, self.conf_slider.value()/100.0, self.frame_counter
                 )
+                self.detection_thread.detection_done.connect(self.on_detection_done)
+                self.detection_thread.start()
                 
-                self.last_violations = result['violations_dict']
-                
-                for human_id, human_violations in result['violations_dict'].items():
-                    for violation in human_violations:
-                        violations.append({
-                            'timestamp': datetime.now().strftime("%H:%M:%S"),
-                            'class': violation['violation_type'],
-                            'confidence': f"{violation['probability']:.3f}",
-                            'human_id': human_id,
-                        })
-                        
-                        self.violation_logger.add_frame_violations(
-                            self.frame_counter,
-                            {human_id: [violation]},
-                            None
-                        )
+    def on_detection_done(self, detections, frame, frame_counter, results):
+        try:
+            violations = []
+            tracks = self.simple_tracking(detections)
             
+            result = self.violation_detector.process_frame(
+                detections, tracks, frame_counter
+            )
+            
+            self.last_violations = result['violations_dict']
+            self.last_detections = detections
+            self.last_tracks = tracks
+            self.frame_counter += 1
+            
+            for human_id, human_violations in result['violations_dict'].items():
+                for violation in human_violations:
+                    violations.append({
+                        'timestamp': datetime.now().strftime("%H:%M:%S"),
+                        'class': violation['violation_type'],
+                        'confidence': f"{violation['probability']:.3f}",
+                        'human_id': human_id,
+                    })
+                    
+                    self.violation_logger.add_frame_violations(
+                        frame_counter,
+                        {human_id: [violation]},
+                        None
+                    )
+            
+            for violation in violations:
+                self.add_violation(violation)
+                
         except Exception as e:
-            print(f"Processing error: {e}")
+            print(f"Detection processing error: {e}")
+        finally:
+            self.processing_frame = False
+    
+    def simple_tracking(self, detections, iou_threshold=0.3):
+        current_tracks = []
+        used_track_ids = set()
+        current_time = time.time()
+        
+        self.track_history = [track for track in self.track_history 
+                            if current_time - track[5] < 60.0]
+        
+        person_detections = [det for det in detections if det['cls'] in ['human', 'person']]
+
+        active_tracks = [track for track in self.track_history 
+                        if current_time - track[5] < 3.0]
+        inactive_tracks = [track for track in self.track_history 
+                          if current_time - track[5] >= 3.0]
+
+        for det in person_detections:
+            x1, y1, x2, y2 = det['bbox']
+            det_box = [x1, y1, x2, y2]
             
-        return processed_frame, violations, detections, tracks
+            best_match = None
+            best_score = 0
+            
+
+            for track in active_tracks:
+                track_box = [track[0], track[1], track[2], track[3]]
+                track_id = track[4]
+                
+                if track_id in used_track_ids:
+                    continue
+                
+                iou_val = _iou(track_box, det_box)
+
+                track_center_x = (track[0] + track[2]) / 2
+                track_center_y = (track[1] + track[3]) / 2
+                det_center_x = (x1 + x2) / 2
+                det_center_y = (y1 + y2) / 2
+                distance = ((det_center_x - track_center_x) ** 2 + (det_center_y - track_center_y) ** 2) ** 0.5
+
+                score = iou_val * 0.8 + max(0, 1 - distance/150) * 0.2
+                
+                if score > best_score and score > 0.4:
+                    best_score = score
+                    best_match = track
+            
+            if best_match:
+                track_id = best_match[4]
+                current_tracks.append((x1, y1, x2, y2, track_id, current_time))
+                used_track_ids.add(track_id)
+                active_tracks = [t for t in active_tracks if t[4] != track_id]
+
+        remaining_detections = [det for det in person_detections 
+                              if not any(track[4] not in used_track_ids for track in current_tracks 
+                                       if _iou(track[:4], det['bbox']) > 0.1)]
+        
+        for det in remaining_detections:
+            x1, y1, x2, y2 = det['bbox']
+            det_box = [x1, y1, x2, y2]
+            
+            best_match = None
+            best_score = 0
+            
+            for track in inactive_tracks:
+                track_box = [track[0], track[1], track[2], track[3]]
+                track_id = track[4]
+                
+                if track_id in used_track_ids:
+                    continue
+                
+                iou_val = _iou(track_box, det_box)
+                
+                if iou_val > best_score and iou_val > 0.5:
+                    best_score = iou_val
+                    best_match = track
+            
+            if best_match:
+                track_id = best_match[4]
+                current_tracks.append((x1, y1, x2, y2, track_id, current_time))
+                used_track_ids.add(track_id)
+
+        for det in person_detections:
+            x1, y1, x2, y2 = det['bbox']
+            det_box = [x1, y1, x2, y2]
+            
+            if any(_iou(track[:4], det_box) > 0.1 for track in current_tracks):
+                continue
+
+            self.next_track_id += 1
+            track_id = self.next_track_id
+            current_tracks.append((x1, y1, x2, y2, track_id, current_time))
+            used_track_ids.add(track_id)
+
+        updated_history = []
+
+        for track in current_tracks:
+            updated_history.append(track)
+        
+        for track in active_tracks:
+            if track[4] not in used_track_ids and current_time - track[5] < 1.5:
+                updated_history.append(track)
+        
+        inactive_to_keep = [track for track in inactive_tracks 
+                          if track[4] not in used_track_ids and current_time - track[5] < 10.0]
+        updated_history.extend(inactive_to_keep[:10])
+        
+        self.track_history = updated_history
+        
+        return [(x1, y1, x2, y2, track_id) for x1, y1, x2, y2, track_id, _ in current_tracks]
     
     def draw_detections_on_frame(self, frame, detections, tracks, violations_dict):
         display_frame = frame.copy()
@@ -953,35 +1048,6 @@ class MainWindow(QMainWindow):
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, track_color, 2)
         
         return display_frame
-    
-    def simple_tracking(self, detections, iou_threshold=0.5):
-        current_tracks = []
-        
-        person_detections = [det for det in detections if det['cls'] in ['human', 'person']]
-        
-        for det in person_detections:
-            x1, y1, x2, y2 = det['bbox']
-            
-            best_match = None
-            best_iou = 0
-            
-            for track in self.tracked_objects:
-                track_box = [track[0], track[1], track[2], track[3]]
-                det_box = [x1, y1, x2, y2]
-                iou_val = _iou(track_box, det_box)
-                
-                if iou_val > best_iou and iou_val > iou_threshold:
-                    best_iou = iou_val
-                    best_match = track
-            
-            if best_match:
-                track_id = best_match[4]
-                current_tracks.append((x1, y1, x2, y2, track_id))
-            else:
-                track_id = len(self.tracked_objects) + 1
-                current_tracks.append((x1, y1, x2, y2, track_id))
-        
-        return current_tracks
         
     def update_display(self):
         self.fps_counter += 1
@@ -1040,15 +1106,12 @@ class MainWindow(QMainWindow):
         unique_violations = len(self.violations_log)
         self.stats_label.setText(f"Violations: {unique_violations}")
         
-        print(f"{log_entry}")
-        
     def clear_journal(self):
         self.violations_list.clear()
         self.violations_log.clear()
         self.violation_detector.clear_recorded_violations()
         self.last_violations.clear()
         self.stats_label.setText("Violations: 0")
-        print("Log cleared")
         
     def export_journal(self):
         if not self.violations_log:
@@ -1064,7 +1127,6 @@ class MainWindow(QMainWindow):
                 df = pd.DataFrame(self.violations_log)
                 df.to_csv(filename, index=False)
                 QMessageBox.information(self, "Success", f"Exported to {filename}")
-                print(f"Exported to {filename}")
                 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Export failed: {e}")
@@ -1077,14 +1139,9 @@ class MainWindow(QMainWindow):
         self.stop_video()
         if hasattr(self, 'violation_logger'):
             self.violation_logger.flush()
-        if hasattr(self, 'model'):
-            del self.model
-        gc.collect()
         event.accept()
 
 def main():
-    gc.collect()
-    
     app = QApplication(sys.argv)
     
     window = MainWindow()
@@ -1092,7 +1149,6 @@ def main():
     
     result = app.exec_()
     
-    gc.collect()
     return result
 
 if __name__ == "__main__":

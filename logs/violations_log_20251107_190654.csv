@@ -1,6 +1,0 @@
-date,frame_id,human_id,processing_time,violation_type,violation_probability,screenshot_path
-2025-11-07,7,human_1,19:07:46.043,no_vest,0.65,
-2025-11-07,13,human_5,19:08:00.323,no_helmet,0.77,
-2025-11-07,13,human_5,19:08:00.323,no_vest,0.71,
-2025-11-07,20,human_2,19:08:07.465,no_helmet,0.86,
-2025-11-07,20,human_2,19:08:07.465,no_vest,0.8,

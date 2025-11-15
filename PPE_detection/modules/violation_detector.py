@@ -34,7 +34,8 @@ class ViolationDetector:
             'gloves': 0.3,
             'head': 0.5,
             'body': 0.6,
-            'palm': 0.5
+            'palm': 0.5,
+            'wrist': 0.4
         }
 
         self.recorded_violations = {}
