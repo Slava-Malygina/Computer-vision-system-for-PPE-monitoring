@@ -4,7 +4,18 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5c8b8f3a-91a0-4521-9daa-de29d2a594cc" name="Changes" comment="" />
+    <list default="true" id="5c8b8f3a-91a0-4521-9daa-de29d2a594cc" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/PPE_detection/modules/utils/export_log.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/PPE_detection/modules/utils/fonts/DejaVuSerif.ttf" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/modules/UI/filter_panel.py" beforeDir="false" afterPath="$PROJECT_DIR$/PPE_detection/modules/UI/filter_panel.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/modules/UI/main_window.py" beforeDir="false" afterPath="$PROJECT_DIR$/PPE_detection/modules/UI/main_window.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/modules/UI/pagination_panel.py" beforeDir="false" afterPath="$PROJECT_DIR$/PPE_detection/modules/UI/pagination_panel.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/modules/UI/violation_log_window.py" beforeDir="false" afterPath="$PROJECT_DIR$/PPE_detection/modules/UI/violation_log_window.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/modules/monitoring_window.py" beforeDir="false" afterPath="$PROJECT_DIR$/PPE_detection/modules/monitoring_window.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/modules/violation_detector.py" beforeDir="false" afterPath="$PROJECT_DIR$/PPE_detection/modules/violation_detector.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Widget3.1.py" beforeDir="false" afterPath="$PROJECT_DIR$/Widget3.1.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -31,44 +42,48 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Python tests.Doctests in __init__.executor&quot;: &quot;Run&quot;,
-    &quot;Python.MainUI.executor&quot;: &quot;Run&quot;,
-    &quot;Python.Widget3.executor&quot;: &quot;Run&quot;,
-    &quot;Python.Widget4 (1).executor&quot;: &quot;Run&quot;,
-    &quot;Python.Widget4.executor&quot;: &quot;Run&quot;,
-    &quot;Python.logger.executor&quot;: &quot;Run&quot;,
-    &quot;Python.main_window (1).executor&quot;: &quot;Run&quot;,
-    &quot;Python.main_window.executor&quot;: &quot;Run&quot;,
-    &quot;Python.monitoring_window (1).executor&quot;: &quot;Run&quot;,
-    &quot;Python.ppe_monitor_app.executor&quot;: &quot;Run&quot;,
-    &quot;Python.test.executor&quot;: &quot;Run&quot;,
-    &quot;Python.video_thread.executor&quot;: &quot;Run&quot;,
-    &quot;Python.violation_detector.executor&quot;: &quot;Run&quot;,
-    &quot;Python.violation_log_window.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;worker1&quot;,
-    &quot;last_opened_file_path&quot;: &quot;D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Python tests.Doctests in __init__.executor": "Run",
+    "Python.MainUI.executor": "Run",
+    "Python.Widget3.1.executor": "Run",
+    "Python.Widget3.executor": "Run",
+    "Python.Widget4 (1).executor": "Run",
+    "Python.Widget4.executor": "Run",
+    "Python.logger.executor": "Run",
+    "Python.main_window (1).executor": "Run",
+    "Python.main_window.executor": "Run",
+    "Python.monitoring_window (1).executor": "Run",
+    "Python.monitoring_window.executor": "Run",
+    "Python.ppe_monitor_app.executor": "Run",
+    "Python.test.executor": "Run",
+    "Python.video_thread.executor": "Run",
+    "Python.violation_detector.executor": "Run",
+    "Python.violation_log_window.executor": "Run",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "main",
+    "last_opened_file_path": "D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/PPE_detection/modules/monitoring_window.py",
+    "two.files.diff.last.used.file": "D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/PPE_detection/modules/monitoring_window.py"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\PPE_detection\modules\UI\fonts" />
       <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring" />
       <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\PPE_detection\modules" />
       <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\PPE_detection" />
       <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\models" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\PPE_detection\modules\utils" />
       <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\PPE_detection\modules\UI" />
       <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\PPE_detection\modules" />
       <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring" />
       <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\PPE_detection\model" />
-      <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\training_test_models" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.main_window (1)">
+  <component name="RunManager">
     <configuration name="Widget4 (1)" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Computer-vision-system-for-PPE-monitoring" />
       <option name="ENV_FILES" value="" />
@@ -213,6 +228,11 @@
           <url>file://$PROJECT_DIR$/Widget3.py</url>
           <line>711</line>
           <option name="timeStamp" value="3" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/monitoring_window.py</url>
+          <line>421</line>
+          <option name="timeStamp" value="5" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

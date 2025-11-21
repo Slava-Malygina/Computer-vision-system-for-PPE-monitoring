@@ -898,7 +898,7 @@ class MainWindow(QMainWindow):
                           if current_time - track[5] >= 2.0]
 
         unmatched_detections = []
-        
+
         for det in person_detections:
             x1, y1, x2, y2 = det['bbox']
             det_box = [x1, y1, x2, y2]

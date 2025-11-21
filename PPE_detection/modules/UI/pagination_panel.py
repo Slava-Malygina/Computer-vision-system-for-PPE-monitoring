@@ -1,9 +1,10 @@
 from PyQt5.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QComboBox)
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 
 
 class PaginationPanel(QWidget):
+    pageChanged = pyqtSignal(int)
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -32,6 +33,13 @@ class PaginationPanel(QWidget):
         nav_layout.addWidget(self.page_label)
         nav_layout.addWidget(self.next_btn)
         main_layout.addLayout(nav_layout)
+
+        self.prev_btn.clicked.connect(self.go_prev)
+        self.next_btn.clicked.connect(self.go_next)
+
+        self._current_page = 1
+        self._total_pages = 1
+        self._update_ui()
 
 
         self.setStyleSheet("""
@@ -66,4 +74,34 @@ class PaginationPanel(QWidget):
                 background-color: #353a43;
             }
         """)
+
+    def go_prev(self):
+        if self._current_page > 1:
+            self._current_page -= 1
+            self._update_ui()
+            self.pageChanged.emit(self._current_page)
+
+    def go_next(self):
+        if self._current_page < self._total_pages:
+            self._current_page += 1
+            self._update_ui()
+            self.pageChanged.emit(self._current_page)
+
+    def set_total_pages(self, total):
+        self._total_pages = max(1, total)
+        if self._current_page > self._total_pages:
+            self._current_page = self._total_pages
+        self._update_ui()
+
+    def set_current_page(self, page):
+        self._current_page = max(1, min(page, self._total_pages))
+        self._update_ui()
+        self.pageChanged.emit(self._current_page)
+
+    def _update_ui(self):
+        self.page_label.setText(f"{self._current_page} of {self._total_pages}")
+        self.prev_btn.setEnabled(self._current_page > 1)
+        self.next_btn.setEnabled(self._current_page < self._total_pages)
+
+
 

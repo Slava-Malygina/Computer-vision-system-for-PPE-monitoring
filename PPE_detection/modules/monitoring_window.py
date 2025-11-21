@@ -428,18 +428,21 @@ class MonitoringTab(QWidget):
         current_time = time.time()
 
         self.track_history = [track for track in self.track_history
-                              if current_time - track[5] < 60.0]
+                              if current_time - track[5] < 30.0]
 
-        person_detections = [det for det in detections if det['cls'] in ['human', 'person']]
+        person_detections = [det for det in detections if det['cls'] in ['person']]
 
         active_tracks = [track for track in self.track_history
-                         if current_time - track[5] < 3.0]
+                         if current_time - track[5] < 2.0]
         inactive_tracks = [track for track in self.track_history
-                           if current_time - track[5] >= 3.0]
+                           if current_time - track[5] >= 2.0]
+
+        unmatched_detections = []
 
         for det in person_detections:
             x1, y1, x2, y2 = det['bbox']
             det_box = [x1, y1, x2, y2]
+            det_center = ((x1 + x2) / 2, (y1 + y2) / 2)
 
             best_match = None
             best_score = 0
@@ -453,31 +456,40 @@ class MonitoringTab(QWidget):
 
                 iou_val = _iou(track_box, det_box)
 
-                track_center_x = (track[0] + track[2]) / 2
-                track_center_y = (track[1] + track[3]) / 2
-                det_center_x = (x1 + x2) / 2
-                det_center_y = (y1 + y2) / 2
-                distance = ((det_center_x - track_center_x) ** 2 + (det_center_y - track_center_y) ** 2) ** 0.5
+                track_center = ((track[0] + track[2]) / 2, (track[1] + track[3]) / 2)
+                distance = ((det_center[0] - track_center[0]) ** 2 +
+                            (det_center[1] - track_center[1]) ** 2) ** 0.5
 
-                score = iou_val * 0.8 + max(0, 1 - distance / 150) * 0.2
+                normalized_distance = max(0, 1 - distance / 300)
 
-                if score > best_score and score > 0.4:
+                if iou_val > 0.1:
+                    score = iou_val * 0.7 + normalized_distance * 0.3
+                else:
+                    score = normalized_distance * 0.5
+
+                if score > best_score and score > 0.3:
                     best_score = score
                     best_match = track
 
             if best_match:
                 track_id = best_match[4]
-                current_tracks.append((x1, y1, x2, y2, track_id, current_time))
+                alpha = 0.3
+                smoothed_x1 = int(alpha * x1 + (1 - alpha) * best_match[0])
+                smoothed_y1 = int(alpha * y1 + (1 - alpha) * best_match[1])
+                smoothed_x2 = int(alpha * x2 + (1 - alpha) * best_match[2])
+                smoothed_y2 = int(alpha * y2 + (1 - alpha) * best_match[3])
+
+                current_tracks.append((smoothed_x1, smoothed_y1, smoothed_x2, smoothed_y2, track_id, current_time))
                 used_track_ids.add(track_id)
-                active_tracks = [t for t in active_tracks if t[4] != track_id]
+            else:
+                unmatched_detections.append(det)
 
-        remaining_detections = [det for det in person_detections
-                                if not any(track[4] not in used_track_ids for track in current_tracks
-                                           if _iou(track[:4], det['bbox']) > 0.1)]
+        remaining_detections = []
 
-        for det in remaining_detections:
+        for det in unmatched_detections:
             x1, y1, x2, y2 = det['bbox']
             det_box = [x1, y1, x2, y2]
+            det_center = ((x1 + x2) / 2, (y1 + y2) / 2)
 
             best_match = None
             best_score = 0
@@ -491,26 +503,50 @@ class MonitoringTab(QWidget):
 
                 iou_val = _iou(track_box, det_box)
 
-                if iou_val > best_score and iou_val > 0.5:
-                    best_score = iou_val
+                track_center = ((track[0] + track[2]) / 2, (track[1] + track[3]) / 2)
+                distance = ((det_center[0] - track_center[0]) ** 2 +
+                            (det_center[1] - track_center[1]) ** 2) ** 0.5
+
+                normalized_distance = max(0, 1 - distance / 400)
+
+                score = iou_val * 0.6 + normalized_distance * 0.4
+
+                if score > best_score and score > 0.4:
+                    best_score = score
                     best_match = track
 
             if best_match:
                 track_id = best_match[4]
                 current_tracks.append((x1, y1, x2, y2, track_id, current_time))
                 used_track_ids.add(track_id)
+            else:
+                remaining_detections.append(det)
 
-        for det in person_detections:
+        for det in remaining_detections:
             x1, y1, x2, y2 = det['bbox']
+
+            is_duplicate = False
             det_box = [x1, y1, x2, y2]
+            det_center = ((x1 + x2) / 2, (y1 + y2) / 2)
 
-            if any(_iou(track[:4], det_box) > 0.1 for track in current_tracks):
-                continue
+            for existing_track in current_tracks:
+                existing_box = [existing_track[0], existing_track[1], existing_track[2], existing_track[3]]
+                existing_center = ((existing_track[0] + existing_track[2]) / 2,
+                                   (existing_track[1] + existing_track[3]) / 2)
 
-            self.next_track_id += 1
-            track_id = self.next_track_id
-            current_tracks.append((x1, y1, x2, y2, track_id, current_time))
-            used_track_ids.add(track_id)
+                iou_val = _iou(existing_box, det_box)
+                distance = ((det_center[0] - existing_center[0]) ** 2 +
+                            (det_center[1] - existing_center[1]) ** 2) ** 0.5
+
+                if iou_val > 0.5 or distance < 50:
+                    is_duplicate = True
+                    break
+
+            if not is_duplicate:
+                self.next_track_id += 1
+                track_id = self.next_track_id
+                current_tracks.append((x1, y1, x2, y2, track_id, current_time))
+                used_track_ids.add(track_id)
 
         updated_history = []
 
@@ -518,12 +554,12 @@ class MonitoringTab(QWidget):
             updated_history.append(track)
 
         for track in active_tracks:
-            if track[4] not in used_track_ids and current_time - track[5] < 1.5:
+            if track[4] not in used_track_ids and current_time - track[5] < 1.0:
                 updated_history.append(track)
 
         inactive_to_keep = [track for track in inactive_tracks
-                            if track[4] not in used_track_ids and current_time - track[5] < 10.0]
-        updated_history.extend(inactive_to_keep[:10])
+                            if track[4] not in used_track_ids and current_time - track[5] < 15.0]
+        updated_history.extend(inactive_to_keep[:5])
 
         self.track_history = updated_history
 

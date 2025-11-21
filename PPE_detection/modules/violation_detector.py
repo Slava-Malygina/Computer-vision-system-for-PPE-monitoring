@@ -1,4 +1,3 @@
-
 def _is_inside(small_box, big_box, threshold=0.5):
     x1, y1, x2, y2 = small_box
     bx1, by1, bx2, by2 = big_box
@@ -31,11 +30,10 @@ class ViolationDetector:
         self.overlap_thresholds = overlap_thresholds or {
             'helmet': 0.4,
             'vest': 0.5,
-            'gloves': 0.3,
+            'glove': 0.3,
             'head': 0.5,
             'body': 0.6,
-            'palm': 0.5,
-            'wrist': 0.4
+            'palm': 0.5
         }
 
         self.recorded_violations = {}
@@ -44,7 +42,6 @@ class ViolationDetector:
         self.recorded_violations.clear()
 
     def process_frame(self, detections, tracked_objects, frame_id):
-
         new_violations = {}
 
         objects_by_class = {}
@@ -54,7 +51,7 @@ class ViolationDetector:
 
         helmets = objects_by_class.get('helmet', [])
         vests = objects_by_class.get('vest', [])
-        gloves = objects_by_class.get('gloves', [])
+        gloves = objects_by_class.get('glove', [])
         heads = objects_by_class.get('head', [])
         bodies = objects_by_class.get('body', [])
         palms = objects_by_class.get('palm', [])
@@ -99,11 +96,11 @@ class ViolationDetector:
                             self.recorded_violations[track_id] = set()
                         self.recorded_violations[track_id].add(violation_type)
 
-            palm_found = [w for w in palms if _is_inside(w['bbox'], person_box, self.overlap_thresholds['palm'])]
-            glove_found = [g for g in gloves if _is_inside(g['bbox'], person_box, self.overlap_thresholds['gloves'])]
+            palm_found = [p for p in palms if _is_inside(p['bbox'], person_box, self.overlap_thresholds['palm'])]
+            glove_found = [g for g in gloves if _is_inside(g['bbox'], person_box, self.overlap_thresholds['glove'])]
 
             if palm_found:
-                palm_conf = max(w['conf'] for w in palm_found)
+                palm_conf = max(p['conf'] for p in palm_found)
                 glove_conf = max((g['conf'] for g in glove_found), default=0)
 
                 if not glove_found or (palm_conf > glove_conf):

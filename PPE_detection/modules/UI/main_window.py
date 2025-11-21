@@ -30,7 +30,7 @@ class MainWindow(QMainWindow):
 
         self.tab_widget.addTab(self.monitoring_window, "Мониторинг")
         self.tab_widget.addTab(self.violation_logs_tab, "Журнал нарушений")
-
+        self.tab_widget.currentChanged.connect(self.on_tab_changed)
         main_layout.addWidget(self.tab_widget)
 
     def style_sheet(self):
@@ -142,6 +142,9 @@ class MainWindow(QMainWindow):
             }
         """
 
+    def on_tab_changed(self, index):
+        if self.tab_widget.widget(index) == self.violation_logs_tab:
+            self.violation_logs_tab.load_logs_once()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

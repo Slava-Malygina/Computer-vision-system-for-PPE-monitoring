@@ -12,6 +12,8 @@ from PyQt5.QtWidgets import QComboBox
 
 
 class FilterPanel(QWidget):
+    downloadRequested = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -69,7 +71,7 @@ class FilterPanel(QWidget):
         sort_group.setLayout(sort_layout)
 
         self.sort_field = QComboBox()
-        self.sort_field.addItems(["Дата", "Время", "ID нарушителя", "Вероятность"])
+        self.sort_field.addItems(["Дата", "Время", "ID нарушителя", "Тип нарушения", "Вероятность"])
         self.sort_order = QComboBox()
         self.sort_order.addItems(["По возрастанию", "По убыванию"])
         sort_layout.addWidget(self.sort_field)
@@ -118,6 +120,7 @@ class FilterPanel(QWidget):
         report_layout.addLayout(btn_layout)
 
         main_layout.addWidget(report_group)
+        self.download_btn.clicked.connect(self.downloadRequested.emit)
         self.setStyleSheet("""
             QDateEdit, QTimeEdit, QSpinBox {
                 background-color: #2a2e35;
@@ -152,6 +155,35 @@ class FilterPanel(QWidget):
                         background-color: #2a5fff;
                     }
             """)
+
+    def get_filter_params(self):
+        violations = []
+        for i in range(self.type_combo.count()):
+            item = self.type_combo.model().item(i)
+            if item.checkState() == Qt.Checked:
+                violations.append(item.text())
+
+        date_from = self.date_from.date().toPyDate()
+        date_to = self.date_to.date().toPyDate()
+
+        time_from = self.time_from.time().toPyTime()
+        time_to = self.time_to.time().toPyTime()
+        prob_min = self.prob_slider.min_value / 100.0
+        prob_max = self.prob_slider.max_value / 100.0
+        sort_field = self.sort_field.currentText()
+        sort_order = self.sort_order.currentText()
+
+        return {
+            "violations": violations,
+            "date_from": date_from,
+            "date_to": date_to,
+            "time_from": time_from,
+            "time_to": time_to,
+            "prob_min": prob_min,
+            "prob_max": prob_max,
+            "sort_field": sort_field,
+            "sort_order": sort_order,
+        }
 
 
 class CheckableComboBox(QComboBox):
@@ -237,6 +269,7 @@ class RangeSlider(QWidget):
         layout.addWidget(self.slider_max)
         layout.addWidget(self.label_range)
 
+
     def update_min(self, value):
         if value > self.max_value:
             self.slider_min.setValue(self.max_value)
@@ -254,4 +287,5 @@ class RangeSlider(QWidget):
             self.max_value = value
         self.label_range.setText(f"{self.min_value}% – {self.max_value}%")
         self.valueChanged.emit(self.min_value, self.max_value)
+
 
