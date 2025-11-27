@@ -10,6 +10,7 @@ class ViolationLogger:
         self.output_dir = output_dir
         self.max_buffer_size = max_buffer_size
         self.buffer = []
+        self._final_merge_done = False
         self.frame_counter = 0
         self.current_date = datetime.now().strftime('%Y-%m-%d')
         self.logger = self._setup_logging()
@@ -134,14 +135,20 @@ class ViolationLogger:
         self.logger.info("ViolationLogger exit")
         return False
 
-    def merge_session_logs(self, master_file="../logs/main_log.csv"):
+    def merge_session_logs(self, master_file=None):
+        if self._final_merge_done:
+            return True
+
+        if master_file is None:
+            master_file = os.path.join(os.path.dirname(self.file_path), "main_log.csv")
+
+        abs_master = os.path.abspath(master_file)
         if not os.path.exists(self.file_path):
             self.logger.warning(f"Session log not found: {self.file_path}")
             return False
 
         try:
-
-            os.makedirs(os.path.dirname(master_file), exist_ok=True)
+            os.makedirs(os.path.dirname(abs_master), exist_ok=True)
             with open(self.file_path, 'r', encoding='utf-8') as sf:
                 reader = csv.DictReader(sf)
                 rows = list(reader)
@@ -150,15 +157,16 @@ class ViolationLogger:
                     return False
                 fieldnames = reader.fieldnames
 
-            file_exists = os.path.exists(master_file)
+            file_exists = os.path.exists(abs_master)
 
-            with open(master_file, 'a', newline='', encoding='utf-8') as mf:
+            with open(abs_master, 'a', newline='', encoding='utf-8') as mf:
                 writer = csv.DictWriter(mf, fieldnames=fieldnames)
                 if not file_exists:
                     writer.writeheader()
                 writer.writerows(rows)
 
-            self.logger.info(f"Merged {len(rows)} records from {self.file_path} → {master_file}")
+            self.logger.info(f"Merged {len(rows)} records from {self.file_path} → {abs_master}")
+            self._final_merge_done = True
             return True
 
         except Exception as e:

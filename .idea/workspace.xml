@@ -5,16 +5,68 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5c8b8f3a-91a0-4521-9daa-de29d2a594cc" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/PPE_detection/modules/utils/export_log.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/PPE_detection/modules/utils/fonts/DejaVuSerif.ttf" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/PPE_detection/modules/UI/filter_panel.py" beforeDir="false" afterPath="$PROJECT_DIR$/PPE_detection/modules/UI/filter_panel.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/main_log.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251112_223944.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251112_224208.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251112_231643.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251113_173242.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_202144.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_224313.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_224734.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_225029.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_225241.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_225323.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_225703.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_225743.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_225754.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_225848.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_225955.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_230104.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_230129.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_230150.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_230612.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_230947.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_231408.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_231534.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_231835.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_232319.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251114_232554.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251115_134118.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251115_173039.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251115_173507.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_144141.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_145242.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_145645.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_145906.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_150022.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_151142.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_151500.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_152321.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_154643.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_154909.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_155036.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_155300.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_155621.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_155844.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_160417.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_160621.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_161146.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_164028.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_164150.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_164537.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_164820.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_165245.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_165332.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_165426.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_165546.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_165807.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/logs/violations_log_20251121_175937.csv" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/PPE_detection/modules/UI/main_window.py" beforeDir="false" afterPath="$PROJECT_DIR$/PPE_detection/modules/UI/main_window.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/PPE_detection/modules/UI/pagination_panel.py" beforeDir="false" afterPath="$PROJECT_DIR$/PPE_detection/modules/UI/pagination_panel.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/PPE_detection/modules/UI/violation_log_window.py" beforeDir="false" afterPath="$PROJECT_DIR$/PPE_detection/modules/UI/violation_log_window.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/modules/logger.py" beforeDir="false" afterPath="$PROJECT_DIR$/PPE_detection/modules/logger.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/PPE_detection/modules/model_loader.py" beforeDir="false" afterPath="$PROJECT_DIR$/PPE_detection/modules/model_loader.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/PPE_detection/modules/monitoring_window.py" beforeDir="false" afterPath="$PROJECT_DIR$/PPE_detection/modules/monitoring_window.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/PPE_detection/modules/violation_detector.py" beforeDir="false" afterPath="$PROJECT_DIR$/PPE_detection/modules/violation_detector.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Widget3.1.py" beforeDir="false" afterPath="$PROJECT_DIR$/Widget3.1.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -42,38 +94,38 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python tests.Doctests in __init__.executor": "Run",
-    "Python.MainUI.executor": "Run",
-    "Python.Widget3.1.executor": "Run",
-    "Python.Widget3.executor": "Run",
-    "Python.Widget4 (1).executor": "Run",
-    "Python.Widget4.executor": "Run",
-    "Python.logger.executor": "Run",
-    "Python.main_window (1).executor": "Run",
-    "Python.main_window.executor": "Run",
-    "Python.monitoring_window (1).executor": "Run",
-    "Python.monitoring_window.executor": "Run",
-    "Python.ppe_monitor_app.executor": "Run",
-    "Python.test.executor": "Run",
-    "Python.video_thread.executor": "Run",
-    "Python.violation_detector.executor": "Run",
-    "Python.violation_log_window.executor": "Run",
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "main",
-    "last_opened_file_path": "D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/PPE_detection/modules/monitoring_window.py",
-    "two.files.diff.last.used.file": "D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/PPE_detection/modules/monitoring_window.py"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python tests.Doctests in __init__.executor&quot;: &quot;Run&quot;,
+    &quot;Python.MainUI.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Widget3.1.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Widget3.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Widget4 (1).executor&quot;: &quot;Run&quot;,
+    &quot;Python.Widget4.executor&quot;: &quot;Run&quot;,
+    &quot;Python.logger.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main_window (1).executor&quot;: &quot;Run&quot;,
+    &quot;Python.main_window.executor&quot;: &quot;Run&quot;,
+    &quot;Python.monitoring_window (1).executor&quot;: &quot;Run&quot;,
+    &quot;Python.monitoring_window.executor&quot;: &quot;Run&quot;,
+    &quot;Python.ppe_monitor_app.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.video_thread.executor&quot;: &quot;Run&quot;,
+    &quot;Python.violation_detector.executor&quot;: &quot;Run&quot;,
+    &quot;Python.violation_log_window.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/PPE_detection/modules&quot;,
+    &quot;two.files.diff.last.used.file&quot;: &quot;D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/PPE_detection/modules/monitoring_window.py&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\PPE_detection\modules" />
+      <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\PPE_detection\modules\utils" />
       <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\PPE_detection\modules\UI\fonts" />
       <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring" />
-      <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\PPE_detection\modules" />
       <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\PPE_detection" />
-      <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\models" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\PPE_detection\modules\utils" />
@@ -83,7 +135,7 @@
       <recent name="D:\учеба\Командный проект\Код\Computer-vision-system-for-PPE-monitoring\PPE_detection\model" />
     </key>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Python.main_window (1)">
     <configuration name="Widget4 (1)" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Computer-vision-system-for-PPE-monitoring" />
       <option name="ENV_FILES" value="" />
@@ -233,6 +285,11 @@
           <url>file://$PROJECT_DIR$/monitoring_window.py</url>
           <line>421</line>
           <option name="timeStamp" value="5" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/PPE_detection/modules/logger.py</url>
+          <line>135</line>
+          <option name="timeStamp" value="6" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

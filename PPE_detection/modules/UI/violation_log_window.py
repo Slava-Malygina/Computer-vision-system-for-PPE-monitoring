@@ -14,9 +14,17 @@ from PPE_detection.modules.utils.export_log import export_to_csv, export_to_xlsx
 
 
 class ViolationLogsTab(QWidget):
-    def __init__(self, master_log_path="../../logs/main_log.csv"):
+    def __init__(self, logger, main_log_path):
         super().__init__()
-        self.master_log_path = master_log_path
+        self.pagination = None
+        self.refresh_btn = None
+        self.per_page_combo = None
+        self.filter_panel = None
+        self.logger = logger
+        self.master_log_path = main_log_path
+        self._session_merged = False
+
+        self.logger = logger
         self.data_loaded = False
         self.current_filtered_data = []
         self.current_page = 1
@@ -87,7 +95,6 @@ class ViolationLogsTab(QWidget):
         main_layout.addLayout(horizontal_layout)
         self.refresh_btn = QPushButton("Обновить")
 
-
         self.refresh_btn.setIconSize(QSize(24, 24))
         self.refresh_btn.setToolTip("Обновить")
         self.refresh_btn.clicked.connect(self.reload_logs)
@@ -114,7 +121,6 @@ class ViolationLogsTab(QWidget):
 
         log_layout.addLayout(pages_reload_layout)
 
-
     def load_logs_once(self):
         if not self.data_loaded:
             self.reload_logs()
@@ -122,23 +128,33 @@ class ViolationLogsTab(QWidget):
 
     def reload_logs(self):
         self.all_logs = []
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        log_path = os.path.join(script_dir, self.master_log_path)
+        master_log_path = self.master_log_path
+        if hasattr(self, 'logger') and self.logger is not None:
+            try:
+                self.logger.flush()
+            except Exception as e:
+                print(f"[WARNING] Ошибка при flush логгера: {e}")
+        all_records = []
 
+        if os.path.exists(master_log_path):
+            try:
+                with open(master_log_path, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    all_records.extend(list(reader))
+            except Exception as e:
+                print(f"[ERROR] Не удалось прочитать main_log: {e}")
 
-        if not os.path.exists(log_path):
-            self.all_logs = []
-            self.display_filtered_logs({})
-            return
+        if hasattr(self, 'logger') and self.logger is not None:
+            session_file = self.logger.get_file_path()
+            if os.path.exists(session_file):
+                try:
+                    with open(session_file, 'r', encoding='utf-8') as f:
+                        reader = csv.DictReader(f)
+                        all_records.extend(list(reader))
+                except Exception as e:
+                    print(f"[ERROR] Не удалось прочитать сессионный лог: {e}")
 
-        try:
-            with open(log_path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                rows = list(reader)
-                self.all_logs = rows
-        except Exception as e:
-            self.all_logs = []
-
+        self.all_logs = all_records
         self.data_loaded = True
         self.display_filtered_logs({})
 
@@ -155,6 +171,7 @@ class ViolationLogsTab(QWidget):
 
     def safe_str(value):
         return str(value) if value is not None else ""
+
     def display_filtered_logs(self, params):
         try:
             filtered = self.all_logs.copy()

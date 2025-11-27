@@ -1,9 +1,12 @@
+import os
+
 from ultralytics import YOLO
 from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QTabWidget
 
+from PPE_detection.modules.logger import ViolationLogger
 from PPE_detection.modules.monitoring_window import MonitoringTab
 from violation_log_window import ViolationLogsTab
-
+import atexit
 import sys
 from PyQt5.QtWidgets import QApplication
 
@@ -24,10 +27,14 @@ class MainWindow(QMainWindow):
         self.tab_widget.setMovable(True)
         self.tab_widget.setTabsClosable(False)
         self.tab_widget.tabBar().setMinimumWidth(400)
+        log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "logs"))
+        self.logger = ViolationLogger(output_dir=log_dir)
 
-        self.violation_logs_tab = ViolationLogsTab()
-        self.monitoring_window = MonitoringTab()
+        main_log_path = os.path.join(log_dir, "main_log.csv")
 
+        self.violation_logs_tab = ViolationLogsTab(self.logger, main_log_path=main_log_path)
+        self.monitoring_window = MonitoringTab(self.logger)
+        atexit.register(self._safe_exit)
         self.tab_widget.addTab(self.monitoring_window, "Мониторинг")
         self.tab_widget.addTab(self.violation_logs_tab, "Журнал нарушений")
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
@@ -142,9 +149,20 @@ class MainWindow(QMainWindow):
             }
         """
 
+    def _safe_exit(self):
+        try:
+            self.logger.flush()
+            self.logger.merge_session_logs(master_file="../logs/main_log.csv")
+        except Exception as e:
+            print(f"Error during final merge: {e}")
+
     def on_tab_changed(self, index):
         if self.tab_widget.widget(index) == self.violation_logs_tab:
             self.violation_logs_tab.load_logs_once()
+
+    def closeEvent(self, event):
+        self._safe_exit()
+        event.accept()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

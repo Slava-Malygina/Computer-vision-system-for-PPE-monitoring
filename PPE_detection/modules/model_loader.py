@@ -11,10 +11,10 @@ class ModelLoader:
         base = os.path.dirname(__file__)
 
         possible_paths = [
-            "best_V6.pt",
+            "best_V8.pt",
             "../model/best.pt",
             "resources/best.pt",
-            os.path.join(base, "best_V6.pt"),
+            os.path.join(base, "best_V8.pt"),
             os.path.join(base, "model", "best.pt"),
             os.path.join(base, "resources", "best.pt"),
         ]

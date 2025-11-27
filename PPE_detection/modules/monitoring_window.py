@@ -19,7 +19,7 @@ from PPE_detection.modules.violation_detector import ViolationDetector, _iou
 
 
 class MonitoringTab(QWidget):
-    def __init__(self):
+    def __init__(self, logger):
         super().__init__()
         self.model = None
         self.video_thread = None
@@ -29,13 +29,12 @@ class MonitoringTab(QWidget):
         self.violations_log = []
         self.available_cameras = []
         self.violation_detector = ViolationDetector()
-        self.violation_logger = ViolationLogger()
-        atexit.register(self.violation_logger.flush)
+        self.violation_logger = logger
         self.track_history = []
         self.frame_counter = 0
         self.processing_frame = False
         self.last_detection_time = 0
-        self.detection_interval = 0.5
+        self.detection_interval = 0.05
         self.next_track_id = 0
 
         self.last_detections = []
