@@ -104,4 +104,3 @@ class PaginationPanel(QWidget):
         self.next_btn.setEnabled(self._current_page < self._total_pages)
 
 
-

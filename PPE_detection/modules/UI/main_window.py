@@ -3,9 +3,9 @@ import os
 from ultralytics import YOLO
 from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QTabWidget
 
-from PPE_detection.modules.logger import ViolationLogger
-from PPE_detection.modules.monitoring_window import MonitoringTab
-from violation_log_window import ViolationLogsTab
+from logger import ViolationLogger
+from monitoring_window import MonitoringTab
+from UI.violation_log_window import ViolationLogsTab
 import atexit
 import sys
 from PyQt5.QtWidgets import QApplication

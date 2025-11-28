@@ -4,13 +4,13 @@ from datetime import datetime, time as dt_time
 from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout,
                              QWidget, QTableWidget, QHeaderView, QTableWidgetItem, QPushButton, QLabel, QComboBox)
 from PyQt5.QtWidgets import QFileDialog
-from PPE_detection.modules.UI.filter_panel import FilterPanel
-from PPE_detection.modules.UI.pagination_panel import PaginationPanel
+from UI.filter_panel import FilterPanel
+from UI.pagination_panel import PaginationPanel
 
 from PyQt5.QtWidgets import QStyledItemDelegate
 from PyQt5.QtCore import Qt, QSize, QDate
 
-from PPE_detection.modules.utils.export_log import export_to_csv, export_to_xlsx, export_to_pdf
+from utils.export_log import export_to_csv, export_to_xlsx, export_to_pdf
 
 
 class ViolationLogsTab(QWidget):
@@ -368,4 +368,3 @@ class PaddingDelegate(QStyledItemDelegate):
         super().initStyleOption(option, index)
         option.displayAlignment = Qt.AlignVCenter | Qt.AlignLeft
         option.text = " " * (self.left // 2) + option.text
-

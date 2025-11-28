@@ -288,4 +288,3 @@ class RangeSlider(QWidget):
         self.label_range.setText(f"{self.min_value}% – {self.max_value}%")
         self.valueChanged.emit(self.min_value, self.max_value)
 
-
