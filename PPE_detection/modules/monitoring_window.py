@@ -11,11 +11,11 @@ from PyQt5.QtWidgets import ( QVBoxLayout, QHBoxLayout,
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QImage, QPixmap
 import time
-from PPE_detection.modules.detection_thread import DetectionThread
-from PPE_detection.modules.logger import ViolationLogger
+from detection_thread import DetectionThread
+from logger import ViolationLogger
 
-from PPE_detection.modules.video_thread import VideoThread
-from PPE_detection.modules.violation_detector import ViolationDetector, _iou
+from video_thread import VideoThread
+from violation_detector import ViolationDetector, _iou
 
 
 class MonitoringTab(QWidget):
@@ -204,11 +204,11 @@ class MonitoringTab(QWidget):
 
         self.conf_slider = QSlider(Qt.Horizontal)
         self.conf_slider.setRange(50, 95)
-        self.conf_slider.setValue(65)
-        self.conf_slider.valueChanged.connect(self.confidence_changed)
+        self.conf_slider.setValue(70)
+        self.conf_slider.valueChanged.connect(self.on_confidence_changed)
         confidence_layout.addWidget(self.conf_slider)
 
-        self.conf_label = QLabel("0.65")
+        self.conf_label = QLabel("0.70")
         self.conf_label.setMinimumWidth(40)
         confidence_layout.addWidget(self.conf_label)
 
@@ -274,7 +274,7 @@ class MonitoringTab(QWidget):
         self.available_cameras = [0]
 
     def load_model(self):
-        from PPE_detection.modules.model_loader import ModelLoader
+        from model_loader import ModelLoader
         try:
             loader = ModelLoader()
             self.model = loader.load()
@@ -432,9 +432,9 @@ class MonitoringTab(QWidget):
         person_detections = [det for det in detections if det['cls'] in ['person']]
 
         active_tracks = [track for track in self.track_history
-                         if current_time - track[5] < 2.0]
+                         if current_time - track[5] < 5.0]
         inactive_tracks = [track for track in self.track_history
-                           if current_time - track[5] >= 2.0]
+                           if current_time - track[5] >= 5.0]
 
         unmatched_detections = []
 
@@ -553,7 +553,7 @@ class MonitoringTab(QWidget):
             updated_history.append(track)
 
         for track in active_tracks:
-            if track[4] not in used_track_ids and current_time - track[5] < 1.0:
+            if track[4] not in used_track_ids and current_time - track[5] < 5.0:
                 updated_history.append(track)
 
         inactive_to_keep = [track for track in inactive_tracks
@@ -683,6 +683,8 @@ class MonitoringTab(QWidget):
         self.violations_log.clear()
         self.violation_detector.clear_recorded_violations()
         self.last_violations.clear()
+        self.track_history.clear()
+        self.next_track_id = 0
         self.stats_label.setText("Нарушения 0")
 
     def export_journal(self):
@@ -703,15 +705,12 @@ class MonitoringTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Export failed: {e}")
 
-    def confidence_changed(self, value):
+    def on_confidence_changed(self, value):
         conf_value = value / 100.0
         self.conf_label.setText(f"{conf_value:.2f}")
 
     def closeEvent(self, event):
         self.stop_video()
         if hasattr(self, 'violation_logger'):
-            print("fff")
             self.violation_logger.flush()
         event.accept()
-
-

@@ -172,4 +172,3 @@ class ViolationLogger:
         except Exception as e:
             self.logger.error(f"Error merging session log: {e}")
             return False
-
