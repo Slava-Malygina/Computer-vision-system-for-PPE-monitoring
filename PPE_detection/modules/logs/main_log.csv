@@ -18,3 +18,15 @@ date,frame_id,human_id,processing_time,violation_type,violation_probability,scre
 2025-11-27,0,human_1,14:14:21.554,no_helmet,0.93,frames/frame_000000.jpg
 2025-11-27,0,human_1,14:14:21.554,no_vest,0.79,frames/frame_000000.jpg
 2025-11-27,0,human_1,14:14:21.554,no_gloves,0.7,frames/frame_000000.jpg
+2025-11-28,0,human_1,20:33:22.483,no_vest,0.72,frames/frame_000000.jpg
+2025-11-28,1,human_1,20:33:22.729,no_helmet,0.83,frames/frame_000001.jpg
+2025-11-28,6,human_1,20:33:23.694,no_gloves,0.78,frames/frame_000006.jpg
+2025-11-28,258,human_3,20:34:26.666,no_helmet,0.85,frames/frame_000258.jpg
+2025-11-28,258,human_3,20:34:26.667,no_vest,0.73,frames/frame_000258.jpg
+2025-11-28,301,human_2,20:34:37.787,no_vest,0.62,frames/frame_000301.jpg
+2025-11-28,306,human_2,20:34:38.981,no_helmet,0.69,frames/frame_000306.jpg
+2025-11-28,316,human_2,20:34:41.715,no_gloves,0.57,frames/frame_000316.jpg
+2025-11-28,363,human_5,20:34:55.839,no_helmet,0.61,frames/frame_000363.jpg
+2025-11-28,366,human_5,20:34:56.495,no_vest,0.57,frames/frame_000366.jpg
+2025-11-28,367,human_6,20:35:10.482,no_vest,0.75,frames/frame_000367.jpg
+2025-11-28,428,human_6,20:35:25.607,no_gloves,0.58,frames/frame_000428.jpg

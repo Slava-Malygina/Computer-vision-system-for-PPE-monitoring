@@ -3,12 +3,13 @@ import os
 from ultralytics import YOLO
 from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QTabWidget
 
-from logger import ViolationLogger
-from monitoring_window import MonitoringTab
-from UI.violation_log_window import ViolationLogsTab
 import atexit
 import sys
 from PyQt5.QtWidgets import QApplication
+
+from modules.UI.violation_log_window import ViolationLogsTab
+from modules.logger import ViolationLogger
+from modules.monitoring_window import MonitoringTab
 
 
 class MainWindow(QMainWindow):
