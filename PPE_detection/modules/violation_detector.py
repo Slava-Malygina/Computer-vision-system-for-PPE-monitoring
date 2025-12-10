@@ -14,6 +14,7 @@ def _is_inside(small_box, big_box, threshold=0.5):
 
     return (inter_area / small_area) >= threshold
 
+
 def _iou(boxA, boxB):
     x_a = max(boxA[0], boxB[0])
     y_a = max(boxA[1], boxB[1])
@@ -26,7 +27,7 @@ def _iou(boxA, boxB):
 
 
 class ViolationDetector:
-    def __init__(self, overlap_thresholds=None):
+    def __init__(self, overlap_thresholds=None, confirmation_frames=3):
         self.overlap_thresholds = overlap_thresholds or {
             'helmet': 0.4,
             'vest': 0.5,
@@ -35,8 +36,9 @@ class ViolationDetector:
             'body': 0.6,
             'palm': 0.5
         }
-
+        self.confirmation_frames = confirmation_frames
         self.recorded_violations = {}
+        self.violation_counters = {}
 
     def clear_recorded_violations(self):
         self.recorded_violations.clear()
@@ -65,53 +67,82 @@ class ViolationDetector:
             head_found = [h for h in heads if _is_inside(h['bbox'], person_box, self.overlap_thresholds['head'])]
             helmet_found = [h for h in helmets if _is_inside(h['bbox'], person_box, self.overlap_thresholds['helmet'])]
 
-            if head_found:
-                head_conf = max(h['conf'] for h in head_found)
-                helmet_conf = max((h['conf'] for h in helmet_found), default=0)
+            head_in_frame = bool(head_found)
+            helmet_in_frame = bool(helmet_found)
 
-                if not helmet_found or (head_conf > helmet_conf):
-                    violation_type = 'no_helmet'
-                    probability = round(head_conf, 2)
+            head_conf = max((h['conf'] for h in head_found), default=0)
+            helmet_conf = max((h['conf'] for h in helmet_found), default=0)
 
-                    if violation_type not in recorded_for_track:
-                        new_person_violations.append({'violation_type': violation_type, 'probability': probability})
-                        if track_id not in self.recorded_violations:
-                            self.recorded_violations[track_id] = set()
-                        self.recorded_violations[track_id].add(violation_type)
+            if track_id not in self.violation_counters:
+                self.violation_counters[track_id] = {'no_helmet': 0, 'no_vest': 0, 'no_gloves': 0}
+            counters = self.violation_counters[track_id]
+
+            if helmet_in_frame and helmet_conf >= head_conf:
+                counters['no_helmet'] = 0
+            elif head_in_frame:
+                counters['no_helmet'] += 1
+
+            if counters['no_helmet'] >= self.confirmation_frames:
+                violation_type = 'no_helmet'
+                probability = round(head_conf, 2)
+                if violation_type not in recorded_for_track:
+                    new_person_violations.append({'violation_type': violation_type, 'probability': probability})
+                    if track_id not in self.recorded_violations:
+                        self.recorded_violations[track_id] = set()
+                    self.recorded_violations[track_id].add(violation_type)
 
             body_found = [b for b in bodies if _is_inside(b['bbox'], person_box, self.overlap_thresholds['body'])]
             vest_found = [v for v in vests if _is_inside(v['bbox'], person_box, self.overlap_thresholds['vest'])]
 
-            if body_found:
-                body_conf = max(b['conf'] for b in body_found)
-                vest_conf = max((v['conf'] for v in vest_found), default=0)
+            body_in_frame = bool(body_found)
+            vest_in_frame = bool(vest_found)
 
-                if not vest_found or (body_conf > vest_conf):
-                    violation_type = 'no_vest'
-                    probability = round(body_conf, 2)
+            body_conf = max((b['conf'] for b in body_found), default=0)
+            vest_conf = max((v['conf'] for v in vest_found), default=0)
 
-                    if violation_type not in recorded_for_track:
-                        new_person_violations.append({'violation_type': violation_type, 'probability': probability})
-                        if track_id not in self.recorded_violations:
-                            self.recorded_violations[track_id] = set()
-                        self.recorded_violations[track_id].add(violation_type)
+            if track_id not in self.violation_counters:
+                self.violation_counters[track_id] = {'no_helmet': 0, 'no_vest': 0, 'no_gloves': 0}
+            counters = self.violation_counters[track_id]
+
+            if vest_in_frame and vest_conf >= body_conf:
+                counters['no_vest'] = 0
+            elif body_in_frame:
+                counters['no_vest'] += 1
+
+            if counters['no_vest'] >= self.confirmation_frames:
+                violation_type = 'no_vest'
+                probability = round(body_conf, 2)
+                if violation_type not in recorded_for_track:
+                    new_person_violations.append({'violation_type': violation_type, 'probability': probability})
+                    if track_id not in self.recorded_violations:
+                        self.recorded_violations[track_id] = set()
+                    self.recorded_violations[track_id].add(violation_type)
 
             palm_found = [p for p in palms if _is_inside(p['bbox'], person_box, self.overlap_thresholds['palm'])]
             glove_found = [g for g in gloves if _is_inside(g['bbox'], person_box, self.overlap_thresholds['glove'])]
+            palm_in_frame = bool(palm_found)
+            glove_in_frame = bool(glove_found)
 
-            if palm_found:
-                palm_conf = max(p['conf'] for p in palm_found)
-                glove_conf = max((g['conf'] for g in glove_found), default=0)
+            palm_conf = max((p['conf'] for p in palm_found), default=0)
+            glove_conf = max((g['conf'] for g in glove_found), default=0)
 
-                if not glove_found or (palm_conf > glove_conf):
-                    violation_type = 'no_gloves'
-                    probability = round(palm_conf, 2)
+            if track_id not in self.violation_counters:
+                self.violation_counters[track_id] = {'no_helmet': 0, 'no_vest': 0, 'no_gloves': 0}
+            counters = self.violation_counters[track_id]
 
-                    if violation_type not in recorded_for_track:
-                        new_person_violations.append({'violation_type': violation_type, 'probability': probability})
-                        if track_id not in self.recorded_violations:
-                            self.recorded_violations[track_id] = set()
-                        self.recorded_violations[track_id].add(violation_type)
+            if glove_in_frame and glove_conf >= palm_conf:
+                counters['no_gloves'] = 0
+            elif palm_in_frame:
+                counters['no_gloves'] += 1
+
+            if counters['no_gloves'] >= self.confirmation_frames:
+                violation_type = 'no_gloves'
+                probability = round(palm_conf, 2)
+                if violation_type not in recorded_for_track:
+                    new_person_violations.append({'violation_type': violation_type, 'probability': probability})
+                    if track_id not in self.recorded_violations:
+                        self.recorded_violations[track_id] = set()
+                    self.recorded_violations[track_id].add(violation_type)
 
             if new_person_violations:
                 new_violations[f'human_{int(track_id)}'] = new_person_violations

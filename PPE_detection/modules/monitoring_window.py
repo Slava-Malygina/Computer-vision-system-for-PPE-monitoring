@@ -33,7 +33,7 @@ class MonitoringTab(QWidget):
         self.frame_counter = 0
         self.processing_frame = False
         self.last_detection_time = 0
-        self.detection_interval = 0.05
+        self.detection_interval = 0.3
         self.next_track_id = 0
 
         self.last_detections = []
@@ -105,8 +105,7 @@ class MonitoringTab(QWidget):
                 qproperty-alignment: AlignCenter;
             }
         """)
-        self.video_label.setText("Выберите источник видеопотока"
-        )
+        self.video_label.setText("Выберите источник видеопотока")
         video_layout.addWidget(self.video_label)
 
         self.progress_bar = QProgressBar()
