@@ -27,7 +27,8 @@ def _iou(boxA, boxB):
 
 
 class ViolationDetector:
-    def __init__(self, overlap_thresholds=None, confirmation_frames=3):
+    def __init__(self, overlap_thresholds=None, conf_thresholds=None, common_conf_threshold=None, confirmation_frames=5):
+
         self.overlap_thresholds = overlap_thresholds or {
             'helmet': 0.4,
             'vest': 0.5,
@@ -36,6 +37,17 @@ class ViolationDetector:
             'body': 0.6,
             'palm': 0.5
         }
+
+        self.conf_thresholds = conf_thresholds or {
+            'helmet': 0.5,
+            'vest': 0.5,
+            'glove': 0.2,
+            'head': 0.6,
+            'body': 0.6,
+            'palm': 0.2,
+            'person': 0.5
+        }
+        self.common_conf_threshold = common_conf_threshold
         self.confirmation_frames = confirmation_frames
         self.recorded_violations = {}
         self.violation_counters = {}
@@ -47,8 +59,18 @@ class ViolationDetector:
     def process_frame(self, detections, tracked_objects, frame_id):
         new_violations = {}
 
-        objects_by_class = {}
+        filtered_detections = []
         for det in detections:
+            cls = det['cls']
+            if not self.common_conf_threshold:
+                min_conf = self.conf_thresholds.get(cls, 0.3)
+            else:
+                min_conf = 0
+            if det['conf'] >= min_conf:
+                filtered_detections.append(det)
+
+        objects_by_class = {}
+        for det in filtered_detections:
             cls = det['cls']
             objects_by_class.setdefault(cls, []).append(det)
 
@@ -109,7 +131,8 @@ class ViolationDetector:
                 counters['no_vest'] = 0
             elif body_in_frame:
                 counters['no_vest'] += 1
-
+            print(counters['no_vest'])
+            print(track_id)
             if counters['no_vest'] >= self.confirmation_frames:
                 violation_type = 'no_vest'
                 probability = round(body_conf, 2)
@@ -135,8 +158,7 @@ class ViolationDetector:
                 counters['no_gloves'] = 0
             elif palm_in_frame:
                 counters['no_gloves'] += 1
-            print(counters['no_gloves'])
-            print(track_id)
+
             if counters['no_gloves'] >= self.confirmation_frames:
                 violation_type = 'no_gloves'
                 probability = round(palm_conf, 2)

@@ -1,0 +1,5 @@
+date,frame_id,human_id,processing_time,violation_type,violation_probability,screenshot_path
+2025-12-10,37,human_1,20:33:32.650,no_helmet,0.86,frames/frame_000037.jpg
+2025-12-10,39,human_1,20:33:33.197,no_vest,0.55,frames/frame_000039.jpg
+2025-12-10,80,human_1,20:33:43.421,no_gloves,0.65,frames/frame_000080.jpg
+2025-12-10,312,human_2,20:34:31.798,no_helmet,0.84,frames/frame_000312.jpg

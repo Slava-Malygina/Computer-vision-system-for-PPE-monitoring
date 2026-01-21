@@ -4,14 +4,15 @@ import cv2
 
 from datetime import datetime
 import pandas as pd
-from PyQt5.QtWidgets import ( QVBoxLayout, QHBoxLayout,
+from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout,
                              QWidget, QLabel, QPushButton, QListWidget,
                              QSlider, QMessageBox, QSplitter, QComboBox, QFileDialog,
-                             QProgressBar, QGroupBox)
+                             QProgressBar, QGroupBox, QCheckBox)
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QImage, QPixmap
 import time
 
+from modules.UI.advanced_conf_dialog import AdvancedConfDialog
 from modules.detection_thread import DetectionThread
 from modules.video_thread import VideoThread
 from modules.violation_detector import ViolationDetector, _iou
@@ -33,7 +34,7 @@ class MonitoringTab(QWidget):
         self.frame_counter = 0
         self.processing_frame = False
         self.last_detection_time = 0
-        self.detection_interval = 0.3
+        self.detection_interval = 0.05
         self.next_track_id = 0
 
         self.last_detections = []
@@ -201,14 +202,32 @@ class MonitoringTab(QWidget):
         confidence_layout.addWidget(QLabel("Порог уверенности:"))
 
         self.conf_slider = QSlider(Qt.Horizontal)
-        self.conf_slider.setRange(50, 95)
-        self.conf_slider.setValue(70)
-        self.conf_slider.valueChanged.connect(self.on_confidence_changed)
+        self.conf_slider.setRange(10, 95)
+        self.conf_slider.setValue(50)
+        self.conf_slider.valueChanged.connect(self.on_common_confidence_changed)
         confidence_layout.addWidget(self.conf_slider)
 
-        self.conf_label = QLabel("0.70")
+        self.conf_label = QLabel("0.50")
         self.conf_label.setMinimumWidth(40)
         confidence_layout.addWidget(self.conf_label)
+
+        self.advanced_btn = QPushButton("⚙️")
+        self.advanced_btn.setFixedSize(40, 35)
+        self.advanced_btn.setStyleSheet("""
+            QPushButton {
+                padding: 0px;           
+            }
+        """)
+        self.advanced_btn.setToolTip("Настройки по классам")
+        self.advanced_btn.clicked.connect(self.open_advanced_conf_dialog)
+
+        self.advanced_conf_checkbox = QCheckBox("Индивидуальные пороги по классам")
+        self.advanced_conf_checkbox.stateChanged.connect(self.on_advanced_conf_toggled)
+        detection_layout.addWidget(self.advanced_conf_checkbox)
+
+        self.advanced_btn.setEnabled(False)
+
+        confidence_layout.addWidget(self.advanced_btn)
 
         detection_layout.addLayout(confidence_layout)
         left_layout.addWidget(detection_group)
@@ -260,7 +279,6 @@ class MonitoringTab(QWidget):
 
         monitor_layout.addWidget(content_splitter)
 
-
     def setup_timers(self):
         self.display_timer = QTimer()
         self.display_timer.timeout.connect(self.update_display)
@@ -279,7 +297,6 @@ class MonitoringTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Cannot load model: {e}")
             self.model = None
-
 
     def browse_video_file(self):
         filename, _ = QFileDialog.getOpenFileName(
@@ -376,8 +393,12 @@ class MonitoringTab(QWidget):
                 self.last_detection_time = current_time
                 self.processing_frame = True
 
+                if self.advanced_conf_checkbox.isChecked():
+                    model_conf = 0.01
+                else:
+                    model_conf = self.conf_slider.value() / 100.0
                 self.detection_thread = DetectionThread(
-                    self.model, frame, self.conf_slider.value() / 100.0, self.frame_counter
+                    self.model, frame, model_conf, self.frame_counter
                 )
                 self.detection_thread.detection_done.connect(self.on_detection_done)
                 self.detection_thread.start()
@@ -428,6 +449,14 @@ class MonitoringTab(QWidget):
                               if current_time - track[5] < 30.0]
 
         person_detections = [det for det in detections if det['cls'] in ['person']]
+        filtered_detections = []
+        for det in person_detections:
+            if not self.violation_detector.common_conf_threshold:
+                min_conf = self.violation_detector.conf_thresholds.get("person", 0.3)
+            else:
+                min_conf = 0
+            if det['conf'] >= min_conf:
+                filtered_detections.append(det)
 
         active_tracks = [track for track in self.track_history
                          if current_time - track[5] < 5.0]
@@ -436,7 +465,7 @@ class MonitoringTab(QWidget):
 
         unmatched_detections = []
 
-        for det in person_detections:
+        for det in filtered_detections:
             x1, y1, x2, y2 = det['bbox']
             det_box = [x1, y1, x2, y2]
             det_center = ((x1 + x2) / 2, (y1 + y2) / 2)
@@ -577,7 +606,17 @@ class MonitoringTab(QWidget):
             'wrist': (255, 165, 0),
         }
 
+        filtered_detections = []
         for det in detections:
+            cls = det['cls']
+            if not self.violation_detector.common_conf_threshold:
+                min_conf = self.violation_detector.conf_thresholds.get(cls, 0.3)
+            else:
+                min_conf = 0
+            if det['conf'] >= min_conf:
+                filtered_detections.append(det)
+
+        for det in filtered_detections:
             x1, y1, x2, y2 = det['bbox']
             class_name = det['cls']
             conf = det['conf']
@@ -703,9 +742,23 @@ class MonitoringTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Export failed: {e}")
 
-    def on_confidence_changed(self, value):
+    def on_common_confidence_changed(self, value):
         conf_value = value / 100.0
         self.conf_label.setText(f"{conf_value:.2f}")
+
+    def on_advanced_conf_toggled(self, state):
+        is_advanced = (state == Qt.Checked)
+        self.violation_detector.common_conf_threshold = not is_advanced
+        self.conf_slider.setEnabled(not is_advanced)
+        self.conf_label.setEnabled(not is_advanced)
+        self.advanced_btn.setEnabled(is_advanced)
+
+    def open_advanced_conf_dialog(self):
+        current = getattr(self.violation_detector, 'conf_thresholds', None)
+        dialog = AdvancedConfDialog(self, current_thresholds=current)
+        if dialog.exec():
+            new_thresholds = dialog.get_thresholds()
+            self.violation_detector.conf_thresholds = new_thresholds
 
     def closeEvent(self, event):
         self.stop_video()

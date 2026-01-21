@@ -18,7 +18,7 @@ class DetectionThread(QThread):
             results = self.model(self.frame,
                                  conf=self.conf_threshold,
                                  verbose=False,
-                                 imgsz=640)
+                                 imgsz=1024)
 
             detections = []
             if len(results) > 0 and results[0].boxes is not None:
@@ -44,7 +44,7 @@ class DetectionThread(QThread):
                 enhanced_results = self.model(enlarged_frame,
                                             conf=max(0.15, self.conf_threshold * 0.7),
                                             verbose=False,
-                                            imgsz=640)
+                                            imgsz=1024)
                 
                 if len(enhanced_results) > 0 and enhanced_results[0].boxes is not None:
                     for box in enhanced_results[0].boxes:

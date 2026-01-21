@@ -1,0 +1,10 @@
+date,frame_id,human_id,processing_time,violation_type,violation_probability,screenshot_path
+2025-12-10,2,human_2,22:11:54.014,no_helmet,0.84,frames/frame_000002.jpg
+2025-12-10,2,human_2,22:11:54.015,no_vest,0.73,frames/frame_000002.jpg
+2025-12-10,29,human_1,22:12:03.038,no_helmet,0.68,frames/frame_000029.jpg
+2025-12-10,30,human_1,22:12:03.378,no_vest,0.65,frames/frame_000030.jpg
+2025-12-10,51,human_1,22:12:10.600,no_gloves,0.61,frames/frame_000051.jpg
+2025-12-10,72,human_1,22:12:39.571,no_vest,0.79,frames/frame_000072.jpg
+2025-12-10,72,human_1,22:12:39.571,no_gloves,0,frames/frame_000072.jpg
+2025-12-10,74,human_2,22:12:40.227,no_vest,0.76,frames/frame_000074.jpg
+2025-12-10,177,human_2,22:13:13.979,no_gloves,0.62,frames/frame_000177.jpg

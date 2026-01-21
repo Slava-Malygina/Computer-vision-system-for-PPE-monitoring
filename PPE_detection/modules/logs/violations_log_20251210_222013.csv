@@ -1,0 +1,16 @@
+date,frame_id,human_id,processing_time,violation_type,violation_probability,screenshot_path
+2025-12-10,2,human_1,22:20:22.811,no_gloves,0,frames/frame_000002.jpg
+2025-12-10,2,human_2,22:20:22.811,no_helmet,0.81,frames/frame_000002.jpg
+2025-12-10,2,human_2,22:20:22.811,no_gloves,0,frames/frame_000002.jpg
+2025-12-10,5,human_2,22:20:23.804,no_vest,0.78,frames/frame_000005.jpg
+2025-12-10,32,human_1,22:20:32.955,no_helmet,0.7,frames/frame_000032.jpg
+2025-12-10,34,human_1,22:20:33.670,no_vest,0.67,frames/frame_000034.jpg
+2025-12-10,77,human_4,22:20:48.320,no_gloves,0,frames/frame_000077.jpg
+2025-12-10,78,human_1,22:20:50.423,no_gloves,0,frames/frame_000078.jpg
+2025-12-10,78,human_2,22:20:50.423,no_helmet,0.77,frames/frame_000078.jpg
+2025-12-10,78,human_2,22:20:50.423,no_vest,0.7,frames/frame_000078.jpg
+2025-12-10,78,human_2,22:20:50.424,no_gloves,0,frames/frame_000078.jpg
+2025-12-10,92,human_1,22:20:58.500,no_gloves,0,frames/frame_000092.jpg
+2025-12-10,92,human_2,22:20:58.500,no_helmet,0.77,frames/frame_000092.jpg
+2025-12-10,92,human_2,22:20:58.500,no_vest,0.7,frames/frame_000092.jpg
+2025-12-10,92,human_2,22:20:58.500,no_gloves,0,frames/frame_000092.jpg
