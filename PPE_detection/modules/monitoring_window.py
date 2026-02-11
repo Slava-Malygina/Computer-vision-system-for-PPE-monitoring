@@ -4,7 +4,7 @@ import cv2
 
 from datetime import datetime
 import pandas as pd
-from PyQt5.QtWidgets import ( QVBoxLayout, QHBoxLayout,
+from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout,
                              QWidget, QLabel, QPushButton, QListWidget,
                              QSlider, QMessageBox, QSplitter, QComboBox, QFileDialog,
                              QProgressBar, QGroupBox)
@@ -13,8 +13,11 @@ from PyQt5.QtGui import QImage, QPixmap
 import time
 
 from modules.detection_thread import DetectionThread
+
 from modules.video_thread import VideoThread
 from modules.violation_detector import ViolationDetector, _iou
+
+from PyQt5.QtWidgets import QLineEdit
 
 
 class MonitoringTab(QWidget):
@@ -123,7 +126,25 @@ class MonitoringTab(QWidget):
         self.source_combo = QComboBox()
         self.source_combo.addItem("Камера", "camera")
         self.source_combo.addItem("Видеофайл", "video")
+        self.source_combo.addItem("IP-камера", "ip_camera")
+        self.source_combo.currentIndexChanged.connect(self.on_source_changed)
         source_layout.addWidget(self.source_combo)
+
+        self.rtsp_input = QLineEdit()
+        self.rtsp_input.setPlaceholderText("Введите RTSP URL (rtsp://...)")
+        self.rtsp_input.setVisible(False)
+        self.rtsp_input.setStyleSheet("""
+            QLineEdit {
+                border: 1px solid #3a424e;
+                border-radius: 4px;
+                padding: 4px;
+            }
+        """)
+
+        self.rtsp_input.textChanged.connect(self.on_rtsp_text_changed)
+        source_layout.addWidget(self.rtsp_input)
+
+        self.rtsp_input.textChanged.connect(self.on_rtsp_text_changed)
 
         self.camera_combo = QComboBox()
         self.camera_combo.setMinimumWidth(120)
@@ -232,7 +253,6 @@ class MonitoringTab(QWidget):
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
 
-
         violations_group = QGroupBox("Последние нарушения")
         violations_layout = QVBoxLayout(violations_group)
 
@@ -260,6 +280,44 @@ class MonitoringTab(QWidget):
 
         monitor_layout.addWidget(content_splitter)
 
+    def on_source_changed(self, index):
+        source_type = self.source_combo.itemData(index)
+        self.rtsp_input.setVisible(source_type == "ip_camera")
+        self.video_path_label.setVisible(source_type == "video")
+        self.browse_btn.setVisible(source_type == "video")
+        self.camera_combo.setVisible(source_type == "camera")
+
+        self.rtsp_input.setStyleSheet("""
+            QLineEdit {
+                border: 1px solid #3a424e;
+                border-radius: 4px;
+                padding: 4px;
+            }
+        """)
+
+    def check_rtsp_url(self) -> bool:
+        if self.source_combo.currentData() == "ip_camera":
+            url = self.rtsp_input.text().strip()
+            return url == "" or url.startswith("rtsp://")
+        return True
+
+    def on_rtsp_text_changed(self):
+        if self.check_rtsp_url():
+            self.rtsp_input.setStyleSheet("""
+                QLineEdit {
+                    border: 1px solid #3a424e;
+                    border-radius: 4px;
+                    padding: 4px;
+                }
+            """)
+        else:
+            self.rtsp_input.setStyleSheet("""
+                QLineEdit {
+                    border: 2px solid red;
+                    border-radius: 4px;
+                    padding: 4px;
+                }
+            """)
 
     def setup_timers(self):
         self.display_timer = QTimer()
@@ -279,7 +337,6 @@ class MonitoringTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Cannot load model: {e}")
             self.model = None
-
 
     def browse_video_file(self):
         filename, _ = QFileDialog.getOpenFileName(
