@@ -1,0 +1,42 @@
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: mediamtx
+    ports:
+      - "8554:8554"
+
+  cam1:
+    image: linuxserver/ffmpeg
+    depends_on: [mediamtx]
+    volumes:
+      - ./videos:/videos
+    command: >
+      -re -stream_loop -1 -i /videos/test_video_1.mov
+      -c:v copy -f rtsp rtsp://mediamtx:8554/stream1
+
+  cam2:
+    image: linuxserver/ffmpeg
+    depends_on: [mediamtx]
+    volumes:
+      - ./videos:/videos
+    command: >
+      -re -stream_loop -1 -i /videos/test_video_2.mp4
+      -c:v copy -f rtsp rtsp://mediamtx:8554/stream2
+
+  cam3:
+    image: linuxserver/ffmpeg
+    depends_on: [mediamtx]
+    volumes:
+      - ./videos:/videos
+    command: >
+      -re -stream_loop -1 -i /videos/test_video_3.mp4
+      -c:v copy -f rtsp rtsp://mediamtx:8554/stream3
+
+  cam4:
+    image: linuxserver/ffmpeg
+    depends_on: [mediamtx]
+    volumes:
+      - ./videos:/videos
+    command: >
+      -re -stream_loop -1 -i /videos/test_video_4.mp4
+      -c:v copy -f rtsp rtsp://mediamtx:8554/stream4
