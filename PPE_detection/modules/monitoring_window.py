@@ -6,10 +6,15 @@ from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButt
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QImage, QPixmap
 import time
-from detection_thread import DetectionThread
-from logger import ViolationLogger
-from video_thread import VideoThread
-from violation_detector import ViolationDetector, _iou
+
+from modules.UI.video_errors import show_error, show_rtsp_error
+from modules.detection_thread import DetectionThread
+
+from modules.video_thread import VideoThread
+from modules.violation_detector import ViolationDetector, _iou
+
+from PyQt5.QtWidgets import QLineEdit
+
 
 class MonitoringTab(QWidget):
     def __init__(self, logger):
@@ -345,11 +350,11 @@ class MonitoringTab(QWidget):
         self.stop_video()
         self.status_label.setText("Завершено")
 
-    def on_video_error(self, error_msg):
-        self.status_label.setText(f"Ошибка: {error_msg}")
-        self.stop_video()
-
     def start_detection(self):
+        self.video_thread.error_occurred.emit(
+            "rtsp_lost",
+            "ТЕСТ: потеря RTSP соединения"
+        )
         if not self.model:
             QMessageBox.warning(self, "Warning", "Model not loaded!")
             return
@@ -724,3 +729,25 @@ class MonitoringTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Cannot load model: {e}")
             self.model = None
+
+    def on_video_error(self, error_code: str, message: str):
+        self.status_label.setText(f"Ошибка: {message}")
+        if error_code in ("rtsp_lost", "rtsp_open_failed"):
+            self.handle_rtsp_loss()
+            return
+        show_error(self, error_code, message)
+        self.stop_video()
+
+    def handle_rtsp_loss(self):
+
+        action = show_rtsp_error(self, "rtsp_lost")
+        if action == "retry":
+            if self.video_thread.open_rtsp():
+                self.status_update.emit("RTSP: переподключение успешно")
+                return True
+            else:
+                self.status_update.emit("RTSP: повторное подключение не удалось")
+                return False
+        else:
+            self.stop_video()
+            return False

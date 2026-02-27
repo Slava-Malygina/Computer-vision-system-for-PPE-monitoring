@@ -3,12 +3,13 @@ import time
 import cv2
 from PyQt5.QtCore import pyqtSignal, QThread
 
+
 class VideoThread(QThread):
     frame_ready = pyqtSignal(object)
     status_update = pyqtSignal(str)
     progress_update = pyqtSignal(int)
     finished_signal = pyqtSignal()
-    error_occurred = pyqtSignal(str)
+    error_occurred = pyqtSignal(str, str)
 
     def __init__(self, source_type, source_path):
         super().__init__()
@@ -18,36 +19,27 @@ class VideoThread(QThread):
         self.cap = None
         self.total_frames = 0
         self.current_frame = 0
+        self.rtsp_reconnect_attempts = 5
+        self.rtsp_reconnect_delay = 1.0
 
     def run(self):
         self.is_running = True
 
         try:
             if self.source_type == 'rtsp':
-                print(f"[RTSP] Попытка подключения к {self.source_path}")
-                self.cap = cv2.VideoCapture(self.source_path, cv2.CAP_FFMPEG)
+                self.status_update.emit("RTSP: подключение...")
 
-                start_time = time.time()
-                opened = False
-                while time.time() - start_time < 5.0 and not opened:
-                    opened = self.cap.isOpened()
-                    if not opened:
-                        time.sleep(0.1)
-                        self.cap.open(self.source_path, cv2.CAP_FFMPEG)
-
-                if not self.cap.isOpened():
-                    error_msg = f"Не удалось открыть RTSP-поток (таймаут 5с): {self.source_path}"
-                    print(f"[RTSP] {error_msg}")
-                    self.error_occurred.emit(error_msg)
-                    self.status_update.emit("Ошибка: RTSP-поток недоступен")
+                if not self.open_rtsp():
+                    self.error_occurred.emit(
+                        "rtsp_open_failed",
+                        f"Не удалось открыть RTSP-поток: {self.source_path}"
+                    )
                     return
+
+                self.status_update.emit(f"RTSP подключён: {self.source_path}")
 
                 print(f"[RTSP] Поток успешно открыт: {self.source_path}")
                 self.status_update.emit(f"RTSP: {self.source_path}")
-
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
             elif self.source_type == 'camera':
                 self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
@@ -58,7 +50,7 @@ class VideoThread(QThread):
 
                 if not self.cap.isOpened():
                     self.status_update.emit("Не удалось открыть устройство камеры")
-                    self.error_occurred.emit("Камера не доступна")
+                    self.error_occurred.emit("camera_unavailable", "Камера не доступна")
                     return
                 self.status_update.emit("Устройство камеры подключено")
 
@@ -66,7 +58,7 @@ class VideoThread(QThread):
                 self.cap = cv2.VideoCapture(self.source_path)
                 if not self.cap.isOpened():
                     self.status_update.emit(f"Не удалось открыть файл: {os.path.basename(self.source_path)}")
-                    self.error_occurred.emit(f"Файл не найден или повреждён: {self.source_path}")
+                    self.error_occurred.emit("video_open_failed", "Файл не найден или повреждён")
                     return
 
                 self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -77,17 +69,39 @@ class VideoThread(QThread):
                     ret, frame = self.cap.read()
                     if not ret:
                         if self.source_type == 'rtsp':
-                            error_msg = "Потеря соединения с RTSP-потоком"
-                            print(f"[RTSP] {error_msg}")
-                            self.error_occurred.emit(error_msg)
-                            self.status_update.emit("Ошибка: потеря RTSP")
-                        else:
-                            if self.source_type == 'video':
-                                self.status_update.emit("Воспроизведение видео завершено")
-                                self.finished_signal.emit()
-                        break
+                            self.status_update.emit("RTSP: соединение потеряно, переподключение...")
+                            reconnected = False
+                            for attempt in range(self.rtsp_reconnect_attempts):
+                                if not self.is_running:
+                                    break
+                                self.status_update.emit(
+                                    f"RTSP: попытка {attempt + 1}/{self.rtsp_reconnect_attempts}"
+                                )
+                                if self.open_rtsp():
+                                    self.status_update.emit("RTSP: соединение восстановлено")
+                                    reconnected = True
+                                    break
+                                time.sleep(self.rtsp_reconnect_delay)
 
-                    if self.source_type == 'camera' or self.source_type == 'rtsp':
+                            if reconnected:
+                                continue
+
+                            self.error_occurred.emit(
+                                "rtsp_lost",
+                                "RTSP-поток недоступен. Переподключение не удалось."
+                            )
+                            break
+                        if self.source_type == 'video':
+                            self.status_update.emit("Воспроизведение видео завершено")
+                            self.finished_signal.emit()
+                            break
+
+                        self.error_occurred.emit(
+                            "camera_lost",
+                            "Потеря соединения с камерой"
+                        )
+                        break
+                    if self.source_type in ('camera', 'rtsp'):
                         small_frame = frame
                     else:
                         small_frame = cv2.resize(frame, (640, 480))
@@ -102,16 +116,19 @@ class VideoThread(QThread):
                     time.sleep(0.033)
 
                 except Exception as e:
-                    error_msg = f"Ошибка чтения кадра: {str(e)}"
-                    print(f"[{self.source_type}] {error_msg}")
-                    self.error_occurred.emit(error_msg)
-                    self.status_update.emit("Ошибка видеопотока")
+                    self.error_occurred.emit(
+                        "frame_read_error",
+                        f"Ошибка чтения кадра: {str(e)}"
+                    )
                     break
 
         except Exception as e:
             error_msg = f"Критическая ошибка в VideoThread: {str(e)}"
             print(f"[VideoThread] {error_msg}")
-            self.error_occurred.emit(error_msg)
+            self.error_occurred.emit(
+                "internal_error",
+                f"Критическая ошибка VideoThread: {str(e)}"
+            )
             self.status_update.emit("Внутренняя ошибка потока")
         finally:
             if self.cap is not None:
@@ -120,5 +137,24 @@ class VideoThread(QThread):
 
     def stop(self):
         self.is_running = False
+
+    def open_rtsp(self, timeout: float = 5.0) -> bool:
         if self.cap is not None:
             self.cap.release()
+            self.cap = None
+
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if not self.is_running:
+                return False
+            cap = cv2.VideoCapture(self.source_path, cv2.CAP_FFMPEG)
+            if cap.isOpened():
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                self.cap = cap
+                return True
+            cap.release()
+            time.sleep(0.3)
+        return False
+

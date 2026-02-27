@@ -1,6 +1,8 @@
 import os
 
 from ultralytics import YOLO
+
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QTabWidget
 
 import atexit
@@ -8,6 +10,7 @@ import sys
 from PyQt5.QtWidgets import QApplication
 
 from modules.UI.violation_log_window import ViolationLogsTab
+from modules.config import APP_ICON_PATH
 from modules.logger import ViolationLogger
 from modules.monitoring_window import MonitoringTab
 
@@ -17,7 +20,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("PPE Monitor")
         self.setGeometry(100, 100, 1400, 800)
-
+        self.setWindowIcon(QIcon(APP_ICON_PATH))
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
@@ -167,6 +170,7 @@ class MainWindow(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon(APP_ICON_PATH))
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
