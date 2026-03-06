@@ -9,19 +9,15 @@ class ModelLoader:
     @staticmethod
     def get_model_path():
         base = os.path.dirname(__file__)
-
+        # Последняя версия модели - визуально показывает лучшие результаты,
+        # в папке model - есть последние 5 версии, best - одна из них
         possible_paths = [
-            "best_V10.pt",
-            "../model/best.pt",
-            "resources/best.pt",
-            os.path.join(base, "best_V10.pt"),
-            os.path.join(base, "model", "best.pt"),
-            os.path.join(base, "resources", "best.pt"),
+            os.path.join(base, "..", "model", "best_12.pt"),
         ]
 
         for path in possible_paths:
-            print(path)
             if os.path.exists(path):
+                print(path)
                 return path
 
         return None
@@ -30,15 +26,13 @@ class ModelLoader:
         try:
             from ultralytics import YOLO
             model_path = self.get_model_path()
-            print(model_path)
             if model_path and os.path.exists(model_path):
                 self.model = YOLO(model_path)
-                print(model_path)
                 self.model_name = os.path.basename(model_path)
-            else:
-                demo_path = os.path.join(os.path.dirname(__file__), "../../yolov8n.pt")
-                self.model = YOLO(demo_path)
-                self.model_name = "yolov8n.pt"
+            # else:
+            #     demo_path = os.path.join(os.path.dirname(__file__), "../../yolov8n.pt")
+            #     self.model = YOLO(demo_path)
+            #     self.model_name = "yolov8n.pt"
             print(model_path)
             return self.model
 

@@ -135,8 +135,7 @@ class ViolationDetector:
                 counters['no_gloves'] = 0
             elif palm_in_frame:
                 counters['no_gloves'] += 1
-            print(counters['no_gloves'])
-            print(track_id)
+
             if counters['no_gloves'] >= self.confirmation_frames:
                 violation_type = 'no_gloves'
                 probability = round(palm_conf, 2)

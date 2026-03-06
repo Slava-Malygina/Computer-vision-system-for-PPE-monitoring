@@ -12,7 +12,7 @@ class RtspConfigDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Настройка IP-камер")
         self.setModal(True)
-        self.resize(520, 380)
+        self.resize(520, 280)
 
         self.rtsp_inputs = []
         self.remove_buttons = []

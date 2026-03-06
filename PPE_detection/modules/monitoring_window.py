@@ -126,7 +126,7 @@ class MonitoringTab(QWidget):
         self.source_combo = QComboBox()
         self.source_combo.addItem("Камера", "camera")
         self.source_combo.addItem("Видеофайл", "video")
-        self.source_combo.addItem("IP-камера", "ip_camera")
+        self.source_combo.addItem("IP-камера", "rtsp")
         self.source_combo.currentIndexChanged.connect(self.on_source_changed)
         source_layout.addWidget(self.source_combo)
 
@@ -224,8 +224,8 @@ class MonitoringTab(QWidget):
         confidence_layout = QHBoxLayout()
         confidence_layout.addWidget(QLabel("Порог уверенности:"))
         self.conf_slider = QSlider(Qt.Horizontal)
-        self.conf_slider.setRange(50, 95)
-        self.conf_slider.setValue(70)
+        self.conf_slider.setRange(20, 95)
+        self.conf_slider.setValue(50)
         self.conf_slider.valueChanged.connect(self.on_confidence_changed)
         confidence_layout.addWidget(self.conf_slider)
         self.conf_label = QLabel("0.70")
@@ -286,7 +286,7 @@ class MonitoringTab(QWidget):
         elif source_type == 'video':
             self.video_path_label.setVisible(True)
             self.browse_btn.setVisible(True)
-        elif source_type == 'ip_camera':
+        elif source_type == 'rtsp':
             self.rtsp_input.setVisible(True)
             self.add_rtsp_btn.setVisible(True)
         self.rtsp_input.setStyleSheet("""
@@ -298,7 +298,7 @@ class MonitoringTab(QWidget):
         """)
 
     def check_rtsp_url(self) -> bool:
-        if self.source_combo.currentData() == "ip_camera":
+        if self.source_combo.currentData() == "rtsp":
             url = self.rtsp_input.text().strip()
             return url == "" or url.startswith("rtsp://")
         return True
@@ -347,7 +347,7 @@ class MonitoringTab(QWidget):
                 QMessageBox.warning(self, "Warning", "Please select a video file first!")
                 return
             source_path = self.current_video_path
-        elif source_type == 'ip_camera':
+        elif source_type == 'rtsp':
             source_path = self.rtsp_input.text().strip()
             if not source_path:
                 QMessageBox.warning(self, "Warning", "Please enter RTSP URL!")
@@ -821,15 +821,15 @@ class MonitoringTab(QWidget):
                     self.camera_manager.remove_camera(manager_idx)
                     del self.camera_index_map[i]
             elif not old_addr and new_addr:
-                manager_idx = self.camera_manager.add_camera("ip_camera", new_addr)
+                manager_idx = self.camera_manager.add_camera("rtsp", new_addr)
                 self.camera_index_map[i] = manager_idx
-                print(new_addr)
+
                 # self.camera_manager.start_camera(manager_idx)
             elif old_addr != new_addr and new_addr:
                 manager_idx = self.camera_index_map.get(i)
                 if manager_idx is not None:
                     self.camera_manager.remove_camera(manager_idx)
-                    new_idx = self.camera_manager.add_camera("ip_camera", new_addr)
+                    new_idx = self.camera_manager.add_camera("rtsp", new_addr)
                     self.camera_index_map[i] = new_idx
                     # self.camera_manager.start_camera(new_idx)
         self.rtsp_addresses = new_addresses
@@ -841,4 +841,4 @@ class MonitoringTab(QWidget):
         else:
             self.rtsp_input.clear()
             self.rtsp_input.setToolTip("")
-        print(self.camera_manager._cameras)
+

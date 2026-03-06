@@ -33,7 +33,7 @@ class CameraManager(QObject):
             thread.deleteLater()
             del self._cameras[index]
             self.camera_removed.emit(index)
-            print("уд")
+
 
     def start_camera(self, index):
         if 0 <= index < len(self._cameras) and index not in self._active_indices:
