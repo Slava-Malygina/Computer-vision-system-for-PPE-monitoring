@@ -1,5 +1,7 @@
 from PyQt5.QtCore import QObject, pyqtSignal
-from video_thread import VideoThread
+
+from modules.video_thread import VideoThread
+
 
 class CameraManager(QObject):
     camera_added = pyqtSignal(int)
@@ -23,6 +25,7 @@ class CameraManager(QObject):
         self.camera_added.emit(index)
         return index
 
+
     def remove_camera(self, index):
         if 0 <= index < len(self._cameras):
             self.stop_camera(index)
@@ -30,6 +33,7 @@ class CameraManager(QObject):
             thread.deleteLater()
             del self._cameras[index]
             self.camera_removed.emit(index)
+            print("уд")
 
     def start_camera(self, index):
         if 0 <= index < len(self._cameras) and index not in self._active_indices:

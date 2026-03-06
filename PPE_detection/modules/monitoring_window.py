@@ -2,12 +2,15 @@ import os
 import cv2
 from datetime import datetime
 import pandas as pd
-from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QListWidget, QSlider, QMessageBox, QSplitter, QComboBox, QFileDialog, QProgressBar, QGroupBox, QLineEdit
+from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QListWidget, QSlider, QMessageBox, \
+    QSplitter, QComboBox, QFileDialog, QProgressBar, QGroupBox, QLineEdit
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QImage, QPixmap
 import time
 
+from modules.UI.rtsp_config_dialog import RtspConfigDialog
 from modules.UI.video_errors import show_error, show_rtsp_error
+from modules.camera_manager import CameraManager
 from modules.detection_thread import DetectionThread
 
 from modules.video_thread import VideoThread
@@ -42,6 +45,9 @@ class MonitoringTab(QWidget):
         self.detect_cameras()
         self.setup_timers()
         self.load_model()
+        self.rtsp_addresses = [""] * RtspConfigDialog.MAX_SOURCES
+        self.camera_manager = CameraManager()
+        self.camera_index_map = {}
 
     def init_ui(self):
         self.setStyleSheet("""
@@ -120,7 +126,8 @@ class MonitoringTab(QWidget):
         self.source_combo = QComboBox()
         self.source_combo.addItem("Камера", "camera")
         self.source_combo.addItem("Видеофайл", "video")
-        self.source_combo.addItem("IP-камера", "rtsp")
+        self.source_combo.addItem("IP-камера", "ip_camera")
+        self.source_combo.currentIndexChanged.connect(self.on_source_changed)
         source_layout.addWidget(self.source_combo)
 
         self.camera_combo = QComboBox()
@@ -130,10 +137,24 @@ class MonitoringTab(QWidget):
         self.video_path_label = QLabel("Файл не выбран")
         source_layout.addWidget(self.video_path_label)
 
-        self.rtsp_edit = QLineEdit()
-        self.rtsp_edit.setPlaceholderText("rtsp://...")
-        self.rtsp_edit.setVisible(False)
-        source_layout.addWidget(self.rtsp_edit)
+        self.rtsp_input = QLineEdit()
+        self.rtsp_input.setPlaceholderText("Введите RTSP URL (rtsp://...)")
+        self.rtsp_input.setVisible(False)
+        self.rtsp_input.setStyleSheet("""
+            QLineEdit {
+                border: 1px solid #3a424e;
+                border-radius: 4px;
+                padding: 4px;
+            }
+        """)
+
+        self.rtsp_input.textChanged.connect(self.on_rtsp_text_changed)
+        source_layout.addWidget(self.rtsp_input)
+
+        self.add_rtsp_btn = QPushButton("Добавить...")
+        self.add_rtsp_btn.setVisible(False)
+        self.add_rtsp_btn.clicked.connect(self._open_rtsp_config)
+        source_layout.addWidget(self.add_rtsp_btn)
 
         self.browse_btn = QPushButton("Выбрать...")
         self.browse_btn.clicked.connect(self.browse_video_file)
@@ -257,15 +278,48 @@ class MonitoringTab(QWidget):
         self.camera_combo.setVisible(False)
         self.video_path_label.setVisible(False)
         self.browse_btn.setVisible(False)
-        self.rtsp_edit.setVisible(False)
+        self.rtsp_input.setVisible(False)
+        self.add_rtsp_btn.setVisible(False)
 
         if source_type == 'camera':
             self.camera_combo.setVisible(True)
         elif source_type == 'video':
             self.video_path_label.setVisible(True)
             self.browse_btn.setVisible(True)
-        elif source_type == 'rtsp':
-            self.rtsp_edit.setVisible(True)
+        elif source_type == 'ip_camera':
+            self.rtsp_input.setVisible(True)
+            self.add_rtsp_btn.setVisible(True)
+        self.rtsp_input.setStyleSheet("""
+            QLineEdit {
+                border: 1px solid #3a424e;
+                border-radius: 4px;
+                padding: 4px;
+            }
+        """)
+
+    def check_rtsp_url(self) -> bool:
+        if self.source_combo.currentData() == "ip_camera":
+            url = self.rtsp_input.text().strip()
+            return url == "" or url.startswith("rtsp://")
+        return True
+
+    def on_rtsp_text_changed(self):
+        if self.check_rtsp_url():
+            self.rtsp_input.setStyleSheet("""
+                QLineEdit {
+                    border: 1px solid #3a424e;
+                    border-radius: 4px;
+                    padding: 4px;
+                }
+            """)
+        else:
+            self.rtsp_input.setStyleSheet("""
+                QLineEdit {
+                    border: 2px solid red;
+                    border-radius: 4px;
+                    padding: 4px;
+                }
+            """)
 
     def detect_cameras(self):
         self.camera_combo.clear()
@@ -283,6 +337,7 @@ class MonitoringTab(QWidget):
             self.current_video_path = filename
 
     def start_video(self):
+
         source_type = self.source_combo.currentData()
 
         if source_type == 'camera':
@@ -292,8 +347,8 @@ class MonitoringTab(QWidget):
                 QMessageBox.warning(self, "Warning", "Please select a video file first!")
                 return
             source_path = self.current_video_path
-        elif source_type == 'rtsp':
-            source_path = self.rtsp_edit.text().strip()
+        elif source_type == 'ip_camera':
+            source_path = self.rtsp_input.text().strip()
             if not source_path:
                 QMessageBox.warning(self, "Warning", "Please enter RTSP URL!")
                 return
@@ -351,10 +406,6 @@ class MonitoringTab(QWidget):
         self.status_label.setText("Завершено")
 
     def start_detection(self):
-        self.video_thread.error_occurred.emit(
-            "rtsp_lost",
-            "ТЕСТ: потеря RTSP соединения"
-        )
         if not self.model:
             QMessageBox.warning(self, "Warning", "Model not loaded!")
             return
@@ -722,7 +773,7 @@ class MonitoringTab(QWidget):
         self.last_fps_time = time.time()
 
     def load_model(self):
-        from model_loader import ModelLoader
+        from modules.model_loader import ModelLoader
         try:
             loader = ModelLoader()
             self.model = loader.load()
@@ -739,7 +790,6 @@ class MonitoringTab(QWidget):
         self.stop_video()
 
     def handle_rtsp_loss(self):
-
         action = show_rtsp_error(self, "rtsp_lost")
         if action == "retry":
             if self.video_thread.open_rtsp():
@@ -751,3 +801,44 @@ class MonitoringTab(QWidget):
         else:
             self.stop_video()
             return False
+
+    def _open_rtsp_config(self):
+        result = RtspConfigDialog.open_and_get(
+            self,
+            existing=self.rtsp_addresses,
+        )
+
+        if result is not None:
+            self._sync_cameras_with_addresses(result)
+        self.rtsp_input.setFocus()
+
+    def _sync_cameras_with_addresses(self, new_addresses: list):
+        old_addresses = self.rtsp_addresses[:]
+        for i, (old_addr, new_addr) in enumerate(zip(old_addresses, new_addresses)):
+            if old_addr and not new_addr:
+                manager_idx = self.camera_index_map.get(i)
+                if manager_idx is not None:
+                    self.camera_manager.remove_camera(manager_idx)
+                    del self.camera_index_map[i]
+            elif not old_addr and new_addr:
+                manager_idx = self.camera_manager.add_camera("ip_camera", new_addr)
+                self.camera_index_map[i] = manager_idx
+                print(new_addr)
+                # self.camera_manager.start_camera(manager_idx)
+            elif old_addr != new_addr and new_addr:
+                manager_idx = self.camera_index_map.get(i)
+                if manager_idx is not None:
+                    self.camera_manager.remove_camera(manager_idx)
+                    new_idx = self.camera_manager.add_camera("ip_camera", new_addr)
+                    self.camera_index_map[i] = new_idx
+                    # self.camera_manager.start_camera(new_idx)
+        self.rtsp_addresses = new_addresses
+
+        active = [addr for addr in new_addresses if addr]
+        if active:
+            self.rtsp_input.setText(active[0])
+            self.rtsp_input.setToolTip(f"Настроено адресов: {len(active)}")
+        else:
+            self.rtsp_input.clear()
+            self.rtsp_input.setToolTip("")
+        print(self.camera_manager._cameras)
