@@ -285,3 +285,14 @@ date,frame_id,human_id,processing_time,violation_type,violation_probability,scre
 2025-12-10,2,human_1,22:34:15.600,no_helmet,0.79,frames/frame_000002.jpg
 2025-12-10,2,human_1,22:34:15.600,no_vest,0.82,frames/frame_000002.jpg
 2025-12-10,18,human_1,22:34:20.587,no_gloves,0.83,frames/frame_000018.jpg
+2026-03-07,2,human_1,13:38:01.602,no_vest,0.0,frames/frame_000002.jpg,D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/test_videos/videos/test_video_2.mp4
+2026-03-07,2,human_2,13:38:01.603,no_vest,0.0,frames/frame_000002.jpg,D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/test_videos/videos/test_video_2.mp4
+2026-03-07,2,human_3,13:38:01.604,no_vest,0.0,frames/frame_000002.jpg,D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/test_videos/videos/test_video_2.mp4
+2026-03-07,2,human_4,13:38:01.604,no_vest,0.0,frames/frame_000002.jpg,D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/test_videos/videos/test_video_2.mp4
+2026-03-07,3,human_5,13:38:01.794,no_vest,0.0,frames/frame_000003.jpg,D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/test_videos/videos/test_video_2.mp4
+2026-03-07,20,human_6,13:38:03.937,no_vest,0.0,frames/frame_000020.jpg,D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/test_videos/videos/test_video_2.mp4
+2026-03-07,2,human_1,13:43:07.885,no_vest,0.71,frames/frame_000002.jpg,D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/test_videos/videos/test_video_2.mp4
+2026-03-07,2,human_2,13:43:07.885,no_vest,0.73,frames/frame_000002.jpg,D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/test_videos/videos/test_video_2.mp4
+2026-03-07,2,human_3,13:43:07.885,no_vest,0.75,frames/frame_000002.jpg,D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/test_videos/videos/test_video_2.mp4
+2026-03-07,2,human_4,13:43:07.886,no_vest,0.64,frames/frame_000002.jpg,D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/test_videos/videos/test_video_2.mp4
+2026-03-07,33,human_5,13:43:12.249,no_vest,0.68,frames/frame_000033.jpg,D:/учеба/Командный проект/Код/Computer-vision-system-for-PPE-monitoring/test_videos/videos/test_video_2.mp4
