@@ -4,14 +4,15 @@ import numpy as np
 
 
 class DetectionThread(QThread):
-    detection_done = pyqtSignal(object, object, object, object)
+    detection_done = pyqtSignal(object, object, object, object, str)
 
-    def __init__(self, model, frame, conf_threshold, frame_counter):
+    def __init__(self, model, frame, conf_threshold, frame_counter, source_id):
         super().__init__()
         self.model = model
         self.frame = frame
         self.conf_threshold = conf_threshold
         self.frame_counter = frame_counter
+        self.source_id = source_id
 
     def run(self):
         try:
@@ -79,7 +80,7 @@ class DetectionThread(QThread):
                                 'area': box_area
                             })
 
-            self.detection_done.emit(detections, self.frame, self.frame_counter, results)
+            self.detection_done.emit(detections, self.frame, self.frame_counter, results, self.source_id)
         except Exception as e:
             print(f"Detection error: {e}")
 

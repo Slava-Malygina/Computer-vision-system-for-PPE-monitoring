@@ -29,8 +29,8 @@ class ViolationLogger:
         self.file_path = os.path.join(output_dir, filename)
 
         try:
-            self.fields = ['date', 'frame_id', 'human_id', 'processing_time', 'violation_type',
-                           'violation_probability', 'screenshot_path']
+            self.fields = ['date', 'id', 'human_id', 'time', 'violation_type',
+                           'confidence', 'screenshot_path', "camera_id"]
             with open(self.file_path, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.DictWriter(f, fieldnames=self.fields)
                 writer.writeheader()
@@ -61,7 +61,7 @@ class ViolationLogger:
 
         return now.strftime('%H:%M:%S.%f')[:-3]
 
-    def add_frame_violations(self, frame_id: int, violations_dict: dict, screenshot_path: str = None):
+    def add_frame_violations(self, frame_id: int, violations_dict: dict, camera_id: str, screenshot_path: str = None):
         try:
             if not violations_dict or not isinstance(violations_dict, dict):
                 self.logger.warning(f"Empty or invalid violation data for frame_id={frame_id}")
@@ -75,15 +75,16 @@ class ViolationLogger:
                 for v in human_violations:
                     self.buffer.append({
                         "date": self.current_date,
-                        "frame_id": frame_id,
-                        "processing_time": self._get_current_time(),
+                        "id": frame_id,        # далее поменять на авто инкремент
+                        "time": self._get_current_time(),
                         "violation_type": v.get('violation_type', 'unknown'),
-                        "violation_probability": v.get("probability", 0.0),
+                        "confidence": v.get("confidence", 0.0),
                         "screenshot_path": screenshot_path or '',
-                        "human_id": human_id
+                        "human_id": human_id,
+                        "camera_id": camera_id
                     })
                     self.logger.info(f"[Frame {frame_id}] {human_id}: {v['violation_type']} "
-                                     f"(вероятность {v['probability']})")
+                                     f"(вероятность {v['confidence']}) cameraID: {camera_id}")
 
             if len(self.buffer) >= self.max_buffer_size:
                 self.flush()

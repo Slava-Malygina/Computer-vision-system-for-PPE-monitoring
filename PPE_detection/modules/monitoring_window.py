@@ -421,7 +421,7 @@ class MonitoringTab(QWidget):
         self.stop_detection_btn.setEnabled(False)
         self.status_label.setText("Остановлено")
 
-    def on_frame_received(self, frame):
+    def on_frame_received(self, frame, source_id):
         self.current_frame = frame
 
         if self.is_detecting and self.model is not None and not self.processing_frame:
@@ -431,12 +431,12 @@ class MonitoringTab(QWidget):
                 self.processing_frame = True
 
                 self.detection_thread = DetectionThread(
-                    self.model, frame, self.conf_slider.value() / 100.0, self.frame_counter
+                    self.model, frame, self.conf_slider.value() / 100.0, self.frame_counter, source_id
                 )
                 self.detection_thread.detection_done.connect(self.on_detection_done)
                 self.detection_thread.start()
 
-    def on_detection_done(self, detections, frame, frame_counter, results):
+    def on_detection_done(self, detections, frame, frame_counter, results, source_id):
         try:
             violations = []
             tracks = self.simple_tracking(detections)
@@ -455,13 +455,14 @@ class MonitoringTab(QWidget):
                     violations.append({
                         'timestamp': datetime.now().strftime("%H:%M:%S"),
                         'class': violation['violation_type'],
-                        'confidence': f"{violation['probability']:.3f}",
+                        'confidence': f"{violation['confidence']:.3f}",
                         'human_id': human_id,
                     })
 
                     self.violation_logger.add_frame_violations(
                         frame_counter,
                         {human_id: [violation]},
+                        source_id,
                         result["screenshot_path"]
                     )
 

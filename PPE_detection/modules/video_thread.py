@@ -5,7 +5,7 @@ from PyQt5.QtCore import pyqtSignal, QThread
 
 
 class VideoThread(QThread):
-    frame_ready = pyqtSignal(object)
+    frame_ready = pyqtSignal(object, str)
     status_update = pyqtSignal(str)
     progress_update = pyqtSignal(int)
     finished_signal = pyqtSignal()
@@ -106,7 +106,7 @@ class VideoThread(QThread):
                     else:
                         small_frame = cv2.resize(frame, (640, 480))
 
-                    self.frame_ready.emit(small_frame)
+                    self.frame_ready.emit(small_frame, self.source_path)
 
                     if self.source_type == 'video':
                         self.current_frame += 1

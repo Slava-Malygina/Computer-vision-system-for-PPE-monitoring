@@ -85,9 +85,9 @@ class ViolationDetector:
 
             if counters['no_helmet'] >= self.confirmation_frames:
                 violation_type = 'no_helmet'
-                probability = round(head_conf, 2)
+                confidence = round(head_conf, 2)
                 if violation_type not in recorded_for_track:
-                    new_person_violations.append({'violation_type': violation_type, 'probability': probability})
+                    new_person_violations.append({'violation_type': violation_type, 'confidence': confidence})
                     if track_id not in self.recorded_violations:
                         self.recorded_violations[track_id] = set()
                     self.recorded_violations[track_id].add(violation_type)
@@ -112,9 +112,9 @@ class ViolationDetector:
 
             if counters['no_vest'] >= self.confirmation_frames:
                 violation_type = 'no_vest'
-                probability = round(body_conf, 2)
+                confidence = round(body_conf, 2)
                 if violation_type not in recorded_for_track:
-                    new_person_violations.append({'violation_type': violation_type, 'probability': probability})
+                    new_person_violations.append({'violation_type': violation_type, 'confidence': confidence})
                     if track_id not in self.recorded_violations:
                         self.recorded_violations[track_id] = set()
                     self.recorded_violations[track_id].add(violation_type)
@@ -138,9 +138,9 @@ class ViolationDetector:
 
             if counters['no_gloves'] >= self.confirmation_frames:
                 violation_type = 'no_gloves'
-                probability = round(palm_conf, 2)
+                confidence = round(palm_conf, 2)
                 if violation_type not in recorded_for_track:
-                    new_person_violations.append({'violation_type': violation_type, 'probability': probability})
+                    new_person_violations.append({'violation_type': violation_type, 'confidence': confidence})
                     if track_id not in self.recorded_violations:
                         self.recorded_violations[track_id] = set()
                     self.recorded_violations[track_id].add(violation_type)
