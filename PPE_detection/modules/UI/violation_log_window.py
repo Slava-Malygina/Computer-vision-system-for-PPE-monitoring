@@ -39,9 +39,9 @@ class ViolationLogsTab(QWidget):
         self.table = QTableWidget()
         self.table.setItemDelegate(PaddingDelegate(left=8))
 
-        self.table.setColumnCount(6)
+        self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels([
-            "Дата", "Время", "ID нарушителя", "Тип нарушения", "Вероятность нарушения", "Путь к скриншоту"
+            "Дата", "Время", "ID нарушителя", "Тип нарушения", "Вероятность нарушения", "ID камеры", "Путь к скриншоту"
         ])
 
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -57,7 +57,7 @@ class ViolationLogsTab(QWidget):
                     QHeaderView::section {
                         background-color: #2a2e35;
                         color: #8a94a6;
-                        padding: 6px;
+                        padding: 6px;ThresholdManager
                         border: none;
                     }
                         QTableWidget::item {
@@ -184,6 +184,13 @@ class ViolationLogsTab(QWidget):
                     if self.violation_matches(row, violation_set)
                 ]
 
+            selected_cameras = params.get("cameras", [])
+            if selected_cameras:
+                filtered = [
+                    row for row in filtered
+                    if self.camera_matches(row.get("camera_id", ""), selected_cameras)
+                ]
+
             if "date_from" in params and "date_to" in params:
                 date_from = params["date_from"]
                 date_to = params["date_to"]
@@ -214,6 +221,7 @@ class ViolationLogsTab(QWidget):
                     "ID нарушителя": lambda r: self.natural_sort_key(r.get("human_id", "")),
                     "Тип нарушения": lambda r: r.get("violation_type", ""),
                     "Вероятность": lambda r: self.parse_probability(r.get("violation_probability", "0")),
+                    "ID камеры": lambda r: "CAM_001",
                 }
                 key_func = sort_key_map.get(params["sort_field"], lambda r: r.get("date", ""))
                 reverse = (params.get("sort_order", "") == "По убыванию")
@@ -258,10 +266,13 @@ class ViolationLogsTab(QWidget):
                 }.get(violation_type_raw, violation_type_raw)
                 self.table.setItem(row_idx, 3, QTableWidgetItem(str(violation_display)))
                 self.table.setItem(row_idx, 4, QTableWidgetItem(str(row.get("violation_probability", "") or "")))
-                self.table.setItem(row_idx, 5, QTableWidgetItem(str(row.get("screenshot_path", "") or "")))
+                camera_id = row.get("camera_id", "")
+                self.table.setItem(row_idx, 5, QTableWidgetItem(str(camera_id) if camera_id else ""))
+                self.table.setItem(row_idx, 6, QTableWidgetItem(str(row.get("screenshot_path", "") or "")))
         finally:
             self.pagination.pageChanged.connect(self._on_page_changed)
             self.per_page_combo.blockSignals(False)
+
     def _on_page_changed(self, page: int):
         self.current_page = page
         self._apply_pagination()
@@ -358,7 +369,17 @@ class ViolationLogsTab(QWidget):
             from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать отчёт:\n{str(e)}")
 
-
+    def camera_matches(self, camera_id, selected_cameras):
+        if not camera_id:
+            return False
+        for selected in selected_cameras:
+            if selected == "Веб-камера" and camera_id == "Camera":
+                return True
+            elif selected == "Видео" and not camera_id.startswith("rtsp") and camera_id != "Camera" and camera_id != "":
+                return True
+            elif camera_id == selected:
+                return True
+        return False
 
 class PaddingDelegate(QStyledItemDelegate):
     def __init__(self, left=8, parent=None):

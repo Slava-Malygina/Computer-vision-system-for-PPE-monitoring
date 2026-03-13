@@ -25,6 +25,22 @@ class FilterPanel(QWidget):
 
         filter_group.setLayout(filter_layout)
         type_layout = QHBoxLayout()
+
+        camera_layout = QHBoxLayout()
+        camera_label = QLabel("По камере:")
+        self.camera_combo = CheckableComboBox()
+        self.camera_combo.addItem("rtsp://localhost:8554/stream1", checked=True)
+        self.camera_combo.addItem("rtsp://localhost:8554/stream2", checked=True)
+        self.camera_combo.addItem("rtsp://localhost:8554/stream3", checked=True)
+        self.camera_combo.addItem("rtsp://localhost:8554/stream4", checked=True)
+        self.camera_combo.addItem("Веб-камера", checked=True)
+        self.camera_combo.addItem("Видео", checked=True)
+
+        camera_layout.addWidget(camera_label)
+        camera_layout.addWidget(self.camera_combo)
+        filter_layout.addLayout(camera_layout)
+
+
         type_label = QLabel("По нарушению:")
         self.type_combo = QComboBox()
         self.type_combo = CheckableComboBox()
@@ -38,7 +54,7 @@ class FilterPanel(QWidget):
 
         date_layout = QHBoxLayout()
         date_layout.addWidget(QLabel("Дата с:"))
-        self.date_from = QDateEdit(QDate.currentDate())
+        self.date_from = QDateEdit(QDate.currentDate().addMonths(-1))
         self.date_from.setCalendarPopup(True)
         date_layout.addWidget(self.date_from)
 
@@ -163,6 +179,12 @@ class FilterPanel(QWidget):
             if item.checkState() == Qt.Checked:
                 violations.append(item.text())
 
+        cameras = []
+        for i in range(self.camera_combo.count()):
+            item = self.camera_combo.model().item(i)
+            if item.checkState() == Qt.Checked:
+                cameras.append(item.text())
+
         date_from = self.date_from.date().toPyDate()
         date_to = self.date_to.date().toPyDate()
 
@@ -175,6 +197,7 @@ class FilterPanel(QWidget):
 
         return {
             "violations": violations,
+            "cameras":  cameras,
             "date_from": date_from,
             "date_to": date_to,
             "time_from": time_from,
