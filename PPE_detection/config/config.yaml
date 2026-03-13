@@ -1,0 +1,37 @@
+cameras:
+- rtsp_url: rtsp://localhost:8554/stream1
+  detection_thresholds:
+    head: 0.6
+    helmet: 0.5
+    body: 0.6
+    vest: 0.5
+    palm: 0.4
+    glove: 0.3
+    person: 0.7
+- rtsp_url: rtsp://localhost:8554/stream2
+  detection_thresholds:
+    head: 0.4
+    helmet: 0.3
+    body: 0.4
+    vest: 0.3
+    palm: 0.3
+    glove: 0.2
+    person: 0.7
+- rtsp_url: rtsp://localhost:8554/stream3
+  detection_thresholds:
+    head: 0.6
+    helmet: 0.5
+    body: 0.6
+    vest: 0.5
+    palm: 0.4
+    glove: 0.3
+    person: 0.7
+- rtsp_url: rtsp://localhost:8554/stream4
+  detection_thresholds:
+    head: 0.4
+    helmet: 0.3
+    body: 0.4
+    vest: 0.3
+    palm: 0.3
+    glove: 0.2
+    person: 0.7
