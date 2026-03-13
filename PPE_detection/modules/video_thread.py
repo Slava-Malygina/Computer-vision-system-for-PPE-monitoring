@@ -105,7 +105,6 @@ class VideoThread(QThread):
                         small_frame = frame
                     else:
                         small_frame = cv2.resize(frame, (640, 480))
-
                     self.frame_ready.emit(small_frame, self.source_path)
 
                     if self.source_type == 'video':

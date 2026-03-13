@@ -163,8 +163,7 @@ class MonitoringTab(QWidget):
         source_layout.addStretch()
         control_layout.addLayout(source_layout)
 
-        self.source_combo.currentIndexChanged.connect(self.on_source_changed)
-        self.on_source_changed(0)
+
 
         buttons_layout = QHBoxLayout()
         self.start_btn = QPushButton("СТАРТ")
@@ -232,7 +231,10 @@ class MonitoringTab(QWidget):
         self.conf_label.setMinimumWidth(40)
         confidence_layout.addWidget(self.conf_label)
 
-        detection_layout.addLayout(confidence_layout)
+        self.confidence_widget = QWidget()
+        self.confidence_widget.setLayout(confidence_layout)
+
+        detection_layout.addWidget(self.confidence_widget)
         left_layout.addWidget(detection_group)
 
         info_widget = QWidget()
@@ -256,12 +258,12 @@ class MonitoringTab(QWidget):
         violations_layout.addWidget(self.violations_list)
 
         log_buttons_layout = QHBoxLayout()
+        log_buttons_layout.addStretch()
         self.clear_btn = QPushButton("Очистить")
+        self.clear_btn.setFixedWidth(100)
         self.clear_btn.clicked.connect(self.clear_journal)
         log_buttons_layout.addWidget(self.clear_btn)
-        self.export_btn = QPushButton("Экспорт CSV")
-        self.export_btn.clicked.connect(self.export_journal)
-        log_buttons_layout.addWidget(self.export_btn)
+        log_buttons_layout.addStretch()
 
         violations_layout.addLayout(log_buttons_layout)
         right_layout.addWidget(violations_group)
@@ -272,6 +274,8 @@ class MonitoringTab(QWidget):
         content_splitter.setSizes([800, 400])
 
         monitor_layout.addWidget(content_splitter)
+        self.source_combo.currentIndexChanged.connect(self.on_source_changed)
+        self.on_source_changed(0)
 
     def on_source_changed(self, index):
         source_type = self.source_combo.currentData()
@@ -283,12 +287,15 @@ class MonitoringTab(QWidget):
 
         if source_type == 'camera':
             self.camera_combo.setVisible(True)
+            self.confidence_widget.setVisible(True)
         elif source_type == 'video':
             self.video_path_label.setVisible(True)
             self.browse_btn.setVisible(True)
+            self.confidence_widget.setVisible(True)
         elif source_type == 'rtsp':
             self.rtsp_input.setVisible(True)
             self.add_rtsp_btn.setVisible(True)
+            self.confidence_widget.setVisible(False)
         self.rtsp_input.setStyleSheet("""
             QLineEdit {
                 border: 1px solid #3a424e;
@@ -341,7 +348,7 @@ class MonitoringTab(QWidget):
         source_type = self.source_combo.currentData()
 
         if source_type == 'camera':
-            source_path = self.camera_combo.currentData()
+            source_path = "camera"
         elif source_type == 'video':
             if not hasattr(self, 'current_video_path') or not self.current_video_path:
                 QMessageBox.warning(self, "Warning", "Please select a video file first!")
@@ -739,23 +746,6 @@ class MonitoringTab(QWidget):
         self.next_track_id = 0
         self.stats_label.setText("Нарушения 0")
 
-    def export_journal(self):
-        if not self.violations_log:
-            QMessageBox.information(self, "Info", "No violations to export!")
-            return
-
-        try:
-            filename, _ = QFileDialog.getSaveFileName(
-                self, "Export Log", "ppe_violations_log.csv", "CSV Files (*.csv)"
-            )
-
-            if filename:
-                df = pd.DataFrame(self.violations_log)
-                df.to_csv(filename, index=False)
-                QMessageBox.information(self, "Success", f"Exported to {filename}")
-
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Export failed: {e}")
 
     def on_confidence_changed(self, value):
         conf_value = value / 100.0
