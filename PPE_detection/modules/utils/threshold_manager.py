@@ -1,6 +1,6 @@
 import os
 import yaml
-from typing import Dict
+from typing import Dict, List
 
 DEFAULT_THRESHOLDS = {
     'head': 0.6,
@@ -56,3 +56,7 @@ class ThresholdManager:
         }
         with open(self.config_path, 'w', encoding='utf-8') as f:
             yaml.dump(config_data, f, allow_unicode=True, sort_keys=False)
+
+    def get_all_rtsp_urls(self) -> List[str]:
+        """Возвращает список всех RTSP-адресов из конфигурации"""
+        return list(self._thresholds_by_rtsp.keys())

@@ -12,6 +12,7 @@ from modules.UI.rtsp_config_dialog import RtspConfigDialog
 from modules.UI.video_errors import show_error, show_rtsp_error
 from modules.camera_manager import CameraManager
 from modules.detection_thread import DetectionThread
+from modules.utils.threshold_manager import ThresholdManager
 
 from modules.video_thread import VideoThread
 from modules.violation_detector import ViolationDetector, _iou
@@ -27,6 +28,7 @@ class MonitoringTab(QWidget):
         self.detection_thread = None
         self.current_frame = None
         self.is_detecting = False
+        self.thresholdManager = ThresholdManager()
         self.violations_log = []
         self.available_cameras = []
         self.violation_detector = ViolationDetector()
@@ -48,6 +50,7 @@ class MonitoringTab(QWidget):
         self.rtsp_addresses = [""] * RtspConfigDialog.MAX_SOURCES
         self.camera_manager = CameraManager()
         self.camera_index_map = {}
+        self.set_addr_auto()
 
     def init_ui(self):
         self.setStyleSheet("""
@@ -274,8 +277,15 @@ class MonitoringTab(QWidget):
         content_splitter.setSizes([800, 400])
 
         monitor_layout.addWidget(content_splitter)
+
         self.source_combo.currentIndexChanged.connect(self.on_source_changed)
         self.on_source_changed(0)
+
+    def set_addr_auto(self):
+        result = self.thresholdManager.get_all_rtsp_urls()
+        self._sync_cameras_with_addresses(result)
+
+
 
     def on_source_changed(self, index):
         source_type = self.source_combo.currentData()
