@@ -10,7 +10,6 @@ class VideoThread(QThread):
     progress_update = pyqtSignal(int)
     finished_signal = pyqtSignal()
     error_occurred = pyqtSignal(str, str)
-    fps_updated = pyqtSignal(float)
 
     def __init__(self, source_type, source_path):
         super().__init__()
@@ -25,8 +24,6 @@ class VideoThread(QThread):
 
     def run(self):
         self.is_running = True
-        self.frame_count = 0
-        self.last_fps_time = time.time()
 
         try:
             if self.source_type == 'rtsp':
@@ -58,7 +55,7 @@ class VideoThread(QThread):
                 self.status_update.emit("Устройство камеры подключено")
 
             else:
-                self.open_rtsp()
+                self.cap = cv2.VideoCapture(self.source_path)
                 if not self.cap.isOpened():
                     self.status_update.emit(f"Не удалось открыть файл: {os.path.basename(self.source_path)}")
                     self.error_occurred.emit("video_open_failed", "Файл не найден или повреждён")
@@ -94,8 +91,6 @@ class VideoThread(QThread):
                                 "RTSP-поток недоступен. Переподключение не удалось."
                             )
                             break
-
-
                         if self.source_type == 'video':
                             self.status_update.emit("Воспроизведение видео завершено")
                             self.finished_signal.emit()
@@ -106,16 +101,6 @@ class VideoThread(QThread):
                             "Потеря соединения с камерой"
                         )
                         break
-
-
-                    self.frame_count += 1
-                    current_time = time.time()
-                    if current_time - self.last_fps_time >= 1.0:
-                        self.current_fps = self.frame_count / (current_time - self.last_fps_time)
-                        self.fps_updated.emit(self.current_fps)
-                        self.frame_count = 0
-                        self.last_fps_time = current_time
-
                     if self.source_type in ('camera', 'rtsp'):
                         small_frame = frame
                     else:
