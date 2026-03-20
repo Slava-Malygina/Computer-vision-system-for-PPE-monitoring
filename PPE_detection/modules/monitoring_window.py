@@ -15,6 +15,7 @@ from modules.camera_manager import CameraManager
 from modules.detection_thread import DetectionThread
 from modules.video_thread import VideoThread
 from modules.violation_detector import ViolationDetector, _iou
+from modules.model_loader import ModelLoader
 
 
 class MonitoringTab(QWidget):
@@ -23,6 +24,7 @@ class MonitoringTab(QWidget):
         self.model = None
         self.single_video_thread = None
         self.detection_thread = None
+        self.detection_threads = []
         self.current_frame = None
         self.is_detecting = False
         self.violations_log = []
@@ -33,7 +35,7 @@ class MonitoringTab(QWidget):
         self.frame_counter = 0
         self.processing_frame = False
         self.last_detection_time = 0
-        self.detection_interval = 0.05
+        self.detection_interval = 0.5
         self.next_track_id = 0
         self.last_detections = []
         self.last_tracks = []
@@ -43,6 +45,7 @@ class MonitoringTab(QWidget):
         self.camera_manager = CameraManager()
         self.camera_index_map = {}
         self.multi_camera_mode = False
+        self.camera_detection_in_progress = {}
 
 
         self.camera_fps = {}
@@ -50,6 +53,12 @@ class MonitoringTab(QWidget):
         self.camera_last_detections = {}
         self.camera_last_tracks = {}
         self.camera_last_violations = {}
+        self.camera_last_frame = {}
+        self.camera_last_displayed_frame = {}
+        self.camera_last_detection_time = {}
+
+        self.camera_original_frames = {}
+        self.camera_displayed_frames = {}
 
         self.init_ui()
         self.detect_cameras()
@@ -301,7 +310,7 @@ class MonitoringTab(QWidget):
             self.add_rtsp_btn.setVisible(True)
             self.single_video_label.setVisible(False)
             self.multi_camera_widget.setMaximumHeight(600)
-            self.multi_camera_widget.set_max_width(1400)
+            
             self.multi_camera_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             active_count = len([a for a in self.rtsp_addresses if a])
             if active_count > 0:
@@ -395,6 +404,10 @@ class MonitoringTab(QWidget):
             self.multi_camera_widget.set_camera_count(len(active_addresses))
             self.single_video_label.setVisible(False)
             self.progress_bar.setVisible(False)
+            self.camera_last_frame.clear()
+            self.camera_last_displayed_frame.clear()
+            self.camera_last_detections.clear()
+            self.camera_manager.start_all()
 
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
@@ -410,6 +423,15 @@ class MonitoringTab(QWidget):
 
         self.camera_manager.stop_all()
         self.multi_camera_mode = False
+        self.camera_detection_in_progress.clear()
+        self.camera_last_detection_time.clear()
+        self.camera_original_frames.clear()
+        self.camera_displayed_frames.clear()
+
+        for thread in self.detection_threads:
+            if thread.isRunning():
+                thread.wait(1000)
+        self.detection_threads.clear()
 
         if self.detection_thread and self.detection_thread.isRunning():
             self.detection_thread.wait(1000)
@@ -510,28 +532,45 @@ class MonitoringTab(QWidget):
             self.processing_frame = False
 
     def on_camera_frame(self, camera_index, frame):
-        self.multi_camera_widget.update_frame(camera_index, frame)
+        self.camera_original_frames[camera_index] = frame
+
+        if camera_index not in self.camera_displayed_frames:
+            self.multi_camera_widget.update_frame(camera_index, frame)
 
         if self.is_detecting and self.model is not None:
-            detection_thread = DetectionThread(
-                self.model, frame, self.conf_slider.value() / 100.0, self.frame_counter
-            )
-            detection_thread.detection_done.connect(
-                lambda det, frm, cnt, res, idx=camera_index: self.on_camera_detection_done(idx, det, frm, cnt, res)
-            )
-            detection_thread.start()
+            if self.camera_detection_in_progress.get(camera_index, False):
+                return
+
+            current_time = time.time()
+            last_time = self.camera_last_detection_time.get(camera_index, 0)
+            if current_time - last_time >= self.detection_interval:
+                self.camera_last_detection_time[camera_index] = current_time
+                self.camera_detection_in_progress[camera_index] = True
+
+                detection_thread = DetectionThread(
+                    self.model, frame, self.conf_slider.value() / 100.0, self.frame_counter
+                )
+                detection_thread.detection_done.connect(
+                    lambda det, frm, cnt, res, idx=camera_index: self.on_camera_detection_done(idx, det, frm, cnt, res)
+                )
+                detection_thread.finished.connect(lambda: self._remove_detection_thread(detection_thread))
+                self.detection_threads.append(detection_thread)
+                detection_thread.start()
+
+    def _remove_detection_thread(self, thread):
+        if thread in self.detection_threads:
+            self.detection_threads.remove(thread)
 
     def on_camera_detection_done(self, camera_index, detections, frame, frame_counter, results):
         try:
             display_frame = frame.copy()
             self.draw_detections_on_frame_simple(display_frame, detections)
-
+            self.camera_displayed_frames[camera_index] = display_frame
             self.multi_camera_widget.update_frame(camera_index, display_frame)
-
-            self.camera_last_detections[camera_index] = detections
-
         except Exception as e:
             print(f"Multi-camera detection error for camera {camera_index}: {e}")
+        finally:
+            self.camera_detection_in_progress[camera_index] = False
 
     def draw_detections_on_frame_simple(self, frame, detections):
         colors = {
@@ -561,7 +600,8 @@ class MonitoringTab(QWidget):
 
     def on_camera_fps(self, camera_index, fps):
         self.camera_fps[camera_index] = fps
-        self.multi_camera_widget.update_fps(camera_index, fps)
+        status = self.camera_status.get(camera_index, "")
+        self.multi_camera_widget.update_status(camera_index, status, fps)
 
     def simple_tracking(self, detections, iou_threshold=0.3):
         current_tracks = []
@@ -863,7 +903,6 @@ class MonitoringTab(QWidget):
         self.last_fps_time = time.time()
 
     def load_model(self):
-        from modules.model_loader import ModelLoader
         try:
             loader = ModelLoader()
             self.model = loader.load()
@@ -897,41 +936,54 @@ class MonitoringTab(QWidget):
         self.rtsp_input.setFocus()
 
     def _sync_cameras_with_addresses(self, new_addresses: list):
-        self.camera_manager.stop_all()
-        for manager_idx in self.camera_index_map.values():
-            try:
-                self.camera_manager.get_frame_ready_signal(manager_idx).disconnect()
-                self.camera_manager.get_status_signal(manager_idx).disconnect()
-                fps_signal = self.camera_manager.get_fps_signal(manager_idx)
-                if fps_signal:
-                    fps_signal.disconnect()
-            except:
-                pass
-            self.camera_manager.remove_camera(manager_idx)
-        active_addresses = [addr for addr in new_addresses if addr]
-        self.camera_index_map.clear()
+        self.camera_last_frame.clear()
+        self.camera_last_displayed_frame.clear()
+        self.camera_last_detections.clear()
+        self.camera_detection_in_progress.clear()
+        self.camera_last_detection_time.clear()
+        test_videos = [
+            "test1.mp4",
+            "test2.mp4",
+            "test3.mp4",
+            "test4.mp4"
+        ]
 
-        for ui_idx, addr in enumerate(active_addresses):
-            manager_idx = self.camera_manager.add_camera("rtsp", addr)
-            self.camera_index_map[ui_idx] = manager_idx
+        old_addresses = self.rtsp_addresses[:]
+        for i, (old_addr, new_addr) in enumerate(zip(old_addresses, new_addresses)):
+            if old_addr and not new_addr:
+                manager_idx = self.camera_index_map.get(i)
+                if manager_idx is not None:
+                    self.camera_manager.remove_camera(manager_idx)
+                    del self.camera_index_map[i]
+            elif not old_addr and new_addr:
 
-            self.camera_manager.get_frame_ready_signal(manager_idx).connect(
-                lambda frame, idx=ui_idx: self.on_camera_frame(idx, frame))
-            self.camera_manager.get_status_signal(manager_idx).connect(
-                lambda status, idx=ui_idx: self.on_camera_status(idx, status))
+                if i < len(test_videos):
+                    video_path = test_videos[i]
+                    manager_idx = self.camera_manager.add_camera("video", video_path)
+                    self.camera_index_map[i] = manager_idx
 
-            fps_signal = self.camera_manager.get_fps_signal(manager_idx)
-            if fps_signal:
-                fps_signal.connect(lambda fps, idx=ui_idx: self.on_camera_fps(idx, fps))
+                    self.camera_manager.get_frame_ready_signal(manager_idx).connect(
+                        lambda frame, idx=i: self.on_camera_frame(idx, frame))
+                    self.camera_manager.get_status_signal(manager_idx).connect(
+                        lambda status, idx=i: self.on_camera_status(idx, status))
+            elif old_addr != new_addr and new_addr:
+                manager_idx = self.camera_index_map.get(i)
+                if manager_idx is not None:
+                    self.camera_manager.remove_camera(manager_idx)
+                if i < len(test_videos):
+                    new_idx = self.camera_manager.add_video_camera(test_videos[i])
+                    self.camera_index_map[i] = new_idx
+                    self.camera_manager.get_frame_ready_signal(new_idx).connect(
+                        lambda frame, idx=i: self.on_camera_frame(idx, frame))
+                    self.camera_manager.get_status_signal(new_idx).connect(
+                        lambda status, idx=i: self.on_camera_status(idx, status))
 
-            if self.stop_btn.isEnabled():
-                self.camera_manager.start_camera(manager_idx)
+        self.rtsp_addresses = new_addresses
 
-        self.rtsp_addresses = new_addresses.copy()
-        self.multi_camera_widget.set_addresses(new_addresses)
+        active = [addr for addr in new_addresses if addr]
+        if active:
 
-        if active_addresses:
             self.multi_camera_widget.setVisible(True)
-            self.multi_camera_widget.set_camera_count(len(active_addresses))
+            self.multi_camera_widget.set_camera_count(len(active))
         else:
             self.multi_camera_widget.setVisible(False)
