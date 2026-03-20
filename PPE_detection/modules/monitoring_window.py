@@ -2,13 +2,15 @@ import os
 import cv2
 from datetime import datetime
 import pandas as pd
-from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QListWidget, QSlider, QMessageBox, \
-    QSplitter, QComboBox, QFileDialog, QProgressBar, QGroupBox, QLineEdit
+from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QListWidget, QSlider, QMessageBox, QSplitter, QComboBox, QFileDialog, QProgressBar, QGroupBox, QLineEdit
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtWidgets import QSizePolicy
 import time
 
+from modules.UI.multi_camera_widget import MultiCameraWidget
 from modules.UI.rtsp_config_dialog import RtspConfigDialog
+from modules.UI.multi_camera_widget import MultiCameraWidget
 from modules.UI.video_errors import show_error, show_rtsp_error
 from modules.camera_manager import CameraManager
 from modules.detection_thread import DetectionThread
@@ -17,14 +19,12 @@ from modules.utils.threshold_manager import ThresholdManager
 from modules.video_thread import VideoThread
 from modules.violation_detector import ViolationDetector, _iou
 
-from PyQt5.QtWidgets import QLineEdit
-
 
 class MonitoringTab(QWidget):
     def __init__(self, logger):
         super().__init__()
         self.model = None
-        self.video_thread = None
+        self.single_video_thread = None
         self.detection_thread = None
         self.current_frame = None
         self.is_detecting = False
@@ -43,6 +43,16 @@ class MonitoringTab(QWidget):
         self.last_tracks = []
         self.last_violations = {}
         self.current_video_path = None
+
+        self.multi_camera_mode = False
+
+
+        self.camera_fps = {}
+        self.camera_status = {}
+        self.camera_last_detections = {}
+        self.camera_last_tracks = {}
+        self.camera_last_violations = {}
+
         self.init_ui()
         self.detect_cameras()
         self.setup_timers()
@@ -87,7 +97,6 @@ class MonitoringTab(QWidget):
             }
         """)
         stats_layout.addWidget(self.stats_label)
-
         header_layout.addWidget(stats_widget)
 
         content_splitter = QSplitter(Qt.Horizontal)
@@ -98,10 +107,10 @@ class MonitoringTab(QWidget):
         video_group = QGroupBox("Мониторинг")
         video_layout = QVBoxLayout(video_group)
 
-        self.video_label = QLabel()
-        self.video_label.setAlignment(Qt.AlignCenter)
-        self.video_label.setMinimumSize(700, 500)
-        self.video_label.setStyleSheet("""
+        self.single_video_label = QLabel()
+        self.single_video_label.setAlignment(Qt.AlignCenter)
+        self.single_video_label.setMinimumSize(700, 500)
+        self.single_video_label.setStyleSheet("""
             QLabel {
                 background-color: #1a1f25;
                 border: 2px solid #2a2e35;
@@ -111,8 +120,12 @@ class MonitoringTab(QWidget):
                 qproperty-alignment: AlignCenter;
             }
         """)
-        self.video_label.setText("Выберите источник видеопотока")
-        video_layout.addWidget(self.video_label)
+        self.single_video_label.setText("Выберите источник видеопотока")
+        video_layout.addWidget(self.single_video_label)
+
+        self.multi_camera_widget = MultiCameraWidget()
+        self.multi_camera_widget.setVisible(False)
+        video_layout.addWidget(self.multi_camera_widget)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
@@ -150,7 +163,6 @@ class MonitoringTab(QWidget):
                 padding: 4px;
             }
         """)
-
         self.rtsp_input.textChanged.connect(self.on_rtsp_text_changed)
         source_layout.addWidget(self.rtsp_input)
 
@@ -165,8 +177,6 @@ class MonitoringTab(QWidget):
 
         source_layout.addStretch()
         control_layout.addLayout(source_layout)
-
-
 
         buttons_layout = QHBoxLayout()
         self.start_btn = QPushButton("СТАРТ")
@@ -230,7 +240,7 @@ class MonitoringTab(QWidget):
         self.conf_slider.setValue(50)
         self.conf_slider.valueChanged.connect(self.on_confidence_changed)
         confidence_layout.addWidget(self.conf_slider)
-        self.conf_label = QLabel("0.70")
+        self.conf_label = QLabel("0.50")
         self.conf_label.setMinimumWidth(40)
         confidence_layout.addWidget(self.conf_label)
 
@@ -297,14 +307,28 @@ class MonitoringTab(QWidget):
 
         if source_type == 'camera':
             self.camera_combo.setVisible(True)
+            self.multi_camera_widget.setVisible(False)
+            self.single_video_label.setVisible(True)
             self.confidence_widget.setVisible(True)
         elif source_type == 'video':
             self.video_path_label.setVisible(True)
             self.browse_btn.setVisible(True)
+            self.multi_camera_widget.setVisible(False)
+            self.single_video_label.setVisible(True)
             self.confidence_widget.setVisible(True)
         elif source_type == 'rtsp':
             self.rtsp_input.setVisible(True)
             self.add_rtsp_btn.setVisible(True)
+            self.single_video_label.setVisible(False)
+            self.multi_camera_widget.setMaximumHeight(600)
+            self.multi_camera_widget.set_max_width(1400)
+            self.multi_camera_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            active_count = len([a for a in self.rtsp_addresses if a])
+            if active_count > 0:
+                self.multi_camera_widget.setVisible(True)
+                self.multi_camera_widget.set_camera_count(active_count)
+            else:
+                self.multi_camera_widget.setVisible(False)
             self.confidence_widget.setVisible(False)
         self.rtsp_input.setStyleSheet("""
             QLineEdit {
@@ -354,41 +378,52 @@ class MonitoringTab(QWidget):
             self.current_video_path = filename
 
     def start_video(self):
-
         source_type = self.source_combo.currentData()
+
+        self.stop_video()
 
         if source_type == 'camera':
             source_path = "camera"
+            source_path = self.camera_combo.currentData()
+            self.single_video_thread = VideoThread(source_type, source_path)
+            self.single_video_thread.frame_ready.connect(self.on_single_frame_received)
+            self.single_video_thread.status_update.connect(self.status_label.setText)
+            self.single_video_thread.progress_update.connect(self.progress_bar.setValue)
+            self.single_video_thread.finished_signal.connect(self.on_video_finished)
+            self.single_video_thread.error_occurred.connect(self.on_single_video_error)
+            self.single_video_thread.start()
+            self.progress_bar.setVisible(False)
+            self.single_video_label.setVisible(True)
+            self.multi_camera_widget.setVisible(False)
+
         elif source_type == 'video':
             if not hasattr(self, 'current_video_path') or not self.current_video_path:
                 QMessageBox.warning(self, "Warning", "Please select a video file first!")
                 return
             source_path = self.current_video_path
-        elif source_type == 'rtsp':
-            source_path = self.rtsp_input.text().strip()
-            if not source_path:
-                QMessageBox.warning(self, "Warning", "Please enter RTSP URL!")
-                return
-        else:
-            return
-
-        if self.video_thread and self.video_thread.isRunning():
-            self.video_thread.stop()
-            self.video_thread.wait()
-
-        self.video_thread = VideoThread(source_type, source_path)
-        self.video_thread.frame_ready.connect(self.on_frame_received)
-        self.video_thread.status_update.connect(self.status_label.setText)
-        self.video_thread.progress_update.connect(self.progress_bar.setValue)
-        self.video_thread.finished_signal.connect(self.on_video_finished)
-        self.video_thread.error_occurred.connect(self.on_video_error)
-
-        if source_type == 'video':
+            self.single_video_thread = VideoThread(source_type, source_path)
+            self.single_video_thread.frame_ready.connect(self.on_single_frame_received)
+            self.single_video_thread.status_update.connect(self.status_label.setText)
+            self.single_video_thread.progress_update.connect(self.progress_bar.setValue)
+            self.single_video_thread.finished_signal.connect(self.on_video_finished)
+            self.single_video_thread.error_occurred.connect(self.on_single_video_error)
+            self.single_video_thread.start()
             self.progress_bar.setVisible(True)
-        else:
-            self.progress_bar.setVisible(False)
+            self.single_video_label.setVisible(True)
+            self.multi_camera_widget.setVisible(False)
 
-        self.video_thread.start()
+        elif source_type == 'rtsp':
+            active_addresses = [addr for addr in self.rtsp_addresses if addr]
+            if not active_addresses:
+                QMessageBox.warning(self, "Warning", "Нет настроенных RTSP-камер. Добавьте адреса.")
+                return
+
+            self.camera_manager.start_all()
+            self.multi_camera_mode = True
+            self.multi_camera_widget.setVisible(True)
+            self.multi_camera_widget.set_camera_count(len(active_addresses))
+            self.single_video_label.setVisible(False)
+            self.progress_bar.setVisible(False)
 
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
@@ -397,9 +432,13 @@ class MonitoringTab(QWidget):
         self.display_timer.start(67)
 
     def stop_video(self):
-        if self.video_thread and self.video_thread.isRunning():
-            self.video_thread.stop()
-            self.video_thread.wait(1000)
+        if self.single_video_thread and self.single_video_thread.isRunning():
+            self.single_video_thread.stop()
+            self.single_video_thread.wait(1000)
+            self.single_video_thread = None
+
+        self.camera_manager.stop_all()
+        self.multi_camera_mode = False
 
         if self.detection_thread and self.detection_thread.isRunning():
             self.detection_thread.wait(1000)
@@ -411,16 +450,25 @@ class MonitoringTab(QWidget):
         self.start_detection_btn.setEnabled(False)
         self.stop_detection_btn.setEnabled(False)
 
-        self.video_label.setText("\n\nВыберите источник видеопотока")
+        self.single_video_label.setText("\n\nВыберите источник видеопотока")
         self.status_label.setText("")
         self.fps_label.setText("FPS: 0")
         self.progress_bar.setVisible(False)
 
         self.current_frame = None
+        self.multi_camera_widget.setVisible(False)
 
     def on_video_finished(self):
         self.stop_video()
         self.status_label.setText("Завершено")
+
+    def on_single_video_error(self, error_code: str, message: str):
+        self.status_label.setText(f"Ошибка: {message}")
+        if error_code in ("rtsp_lost", "rtsp_open_failed"):
+            self.handle_rtsp_loss()
+            return
+        show_error(self, error_code, message)
+        self.stop_video()
 
     def start_detection(self):
         if not self.model:
@@ -490,6 +538,60 @@ class MonitoringTab(QWidget):
             print(f"Detection processing error: {e}")
         finally:
             self.processing_frame = False
+
+    def on_camera_frame(self, camera_index, frame):
+        self.multi_camera_widget.update_frame(camera_index, frame)
+
+        if self.is_detecting and self.model is not None:
+            detection_thread = DetectionThread(
+                self.model, frame, self.conf_slider.value() / 100.0, self.frame_counter
+            )
+            detection_thread.detection_done.connect(
+                lambda det, frm, cnt, res, idx=camera_index: self.on_camera_detection_done(idx, det, frm, cnt, res)
+            )
+            detection_thread.start()
+
+    def on_camera_detection_done(self, camera_index, detections, frame, frame_counter, results):
+        try:
+            display_frame = frame.copy()
+            self.draw_detections_on_frame_simple(display_frame, detections)
+
+            self.multi_camera_widget.update_frame(camera_index, display_frame)
+
+            self.camera_last_detections[camera_index] = detections
+
+        except Exception as e:
+            print(f"Multi-camera detection error for camera {camera_index}: {e}")
+
+    def draw_detections_on_frame_simple(self, frame, detections):
+        colors = {
+            'helmet': (0, 255, 0),
+            'vest': (255, 0, 0),
+            'gloves': (0, 255, 255),
+            'human': (255, 0, 255),
+            'person': (255, 0, 255),
+            'head': (255, 255, 0),
+            'body': (0, 165, 255),
+            'palm': (128, 0, 128),
+            'wrist': (255, 165, 0),
+        }
+        for det in detections:
+            x1, y1, x2, y2 = det['bbox']
+            class_name = det['cls']
+            conf = det['conf']
+            color = colors.get(class_name, (255, 255, 255))
+            label = f"{class_name} {conf:.2f}"
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+            cv2.putText(frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+    def on_camera_status(self, camera_index, status):
+        self.camera_status[camera_index] = status
+        fps = self.camera_fps.get(camera_index)
+        self.multi_camera_widget.update_status(camera_index, status, fps)
+
+    def on_camera_fps(self, camera_index, fps):
+        self.camera_fps[camera_index] = fps
+        self.multi_camera_widget.update_fps(camera_index, fps)
 
     def simple_tracking(self, detections, iou_threshold=0.3):
         current_tracks = []
@@ -698,7 +800,7 @@ class MonitoringTab(QWidget):
             self.fps_counter = 0
             self.last_fps_time = current_time
 
-        if self.current_frame is not None:
+        if self.current_frame is not None and not self.multi_camera_mode:
             display_frame = self.current_frame.copy()
 
             if hasattr(self, 'last_detections') and hasattr(self, 'last_tracks'):
@@ -778,17 +880,11 @@ class MonitoringTab(QWidget):
         try:
             loader = ModelLoader()
             self.model = loader.load()
+            if self.model:
+                self.model_label.setText(f"Модель: {loader.model_name}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Cannot load model: {e}")
             self.model = None
-
-    def on_video_error(self, error_code: str, message: str):
-        self.status_label.setText(f"Ошибка: {message}")
-        if error_code in ("rtsp_lost", "rtsp_open_failed"):
-            self.handle_rtsp_loss()
-            return
-        show_error(self, error_code, message)
-        self.stop_video()
 
     def handle_rtsp_loss(self):
         action = show_rtsp_error(self, "rtsp_lost")
@@ -814,32 +910,41 @@ class MonitoringTab(QWidget):
         self.rtsp_input.setFocus()
 
     def _sync_cameras_with_addresses(self, new_addresses: list):
-        old_addresses = self.rtsp_addresses[:]
-        for i, (old_addr, new_addr) in enumerate(zip(old_addresses, new_addresses)):
-            if old_addr and not new_addr:
-                manager_idx = self.camera_index_map.get(i)
-                if manager_idx is not None:
-                    self.camera_manager.remove_camera(manager_idx)
-                    del self.camera_index_map[i]
-            elif not old_addr and new_addr:
-                manager_idx = self.camera_manager.add_camera("rtsp", new_addr)
-                self.camera_index_map[i] = manager_idx
+        self.camera_manager.stop_all()
+        for manager_idx in self.camera_index_map.values():
+            try:
+                self.camera_manager.get_frame_ready_signal(manager_idx).disconnect()
+                self.camera_manager.get_status_signal(manager_idx).disconnect()
+                fps_signal = self.camera_manager.get_fps_signal(manager_idx)
+                if fps_signal:
+                    fps_signal.disconnect()
+            except:
+                pass
+            self.camera_manager.remove_camera(manager_idx)
+        active_addresses = [addr for addr in new_addresses if addr]
+        self.camera_index_map.clear()
 
-                # self.camera_manager.start_camera(manager_idx)
-            elif old_addr != new_addr and new_addr:
-                manager_idx = self.camera_index_map.get(i)
-                if manager_idx is not None:
-                    self.camera_manager.remove_camera(manager_idx)
-                    new_idx = self.camera_manager.add_camera("rtsp", new_addr)
-                    self.camera_index_map[i] = new_idx
-                    # self.camera_manager.start_camera(new_idx)
-        self.rtsp_addresses = new_addresses
+        for ui_idx, addr in enumerate(active_addresses):
+            manager_idx = self.camera_manager.add_camera("rtsp", addr)
+            self.camera_index_map[ui_idx] = manager_idx
 
-        active = [addr for addr in new_addresses if addr]
-        if active:
-            self.rtsp_input.setText(active[0])
-            self.rtsp_input.setToolTip(f"Настроено адресов: {len(active)}")
+            self.camera_manager.get_frame_ready_signal(manager_idx).connect(
+                lambda frame, idx=ui_idx: self.on_camera_frame(idx, frame))
+            self.camera_manager.get_status_signal(manager_idx).connect(
+                lambda status, idx=ui_idx: self.on_camera_status(idx, status))
+
+            fps_signal = self.camera_manager.get_fps_signal(manager_idx)
+            if fps_signal:
+                fps_signal.connect(lambda fps, idx=ui_idx: self.on_camera_fps(idx, fps))
+
+            if self.stop_btn.isEnabled():
+                self.camera_manager.start_camera(manager_idx)
+
+        self.rtsp_addresses = new_addresses.copy()
+        self.multi_camera_widget.set_addresses(new_addresses)
+
+        if active_addresses:
+            self.multi_camera_widget.setVisible(True)
+            self.multi_camera_widget.set_camera_count(len(active_addresses))
         else:
-            self.rtsp_input.clear()
-            self.rtsp_input.setToolTip("")
-
+            self.multi_camera_widget.setVisible(False)
