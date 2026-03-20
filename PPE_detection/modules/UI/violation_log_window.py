@@ -1,35 +1,59 @@
-import csv
-import os
-from datetime import datetime, time as dt_time
 from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout,
                              QWidget, QTableWidget, QHeaderView, QTableWidgetItem, QPushButton, QLabel, QComboBox)
 from PyQt5.QtWidgets import QFileDialog
 
 
 from PyQt5.QtWidgets import QStyledItemDelegate
-from PyQt5.QtCore import Qt, QSize, QDate
+from PyQt5.QtCore import Qt, QSize, QDate, QTime
 
 from modules.UI.filter_panel import FilterPanel
 from modules.UI.pagination_panel import PaginationPanel
+from modules.database.sqlite_logger import SQLiteLogger
 from modules.utils.export_log import export_to_pdf, export_to_csv, export_to_xlsx
 
+VIOLATION_MAP = {
+    "Без каски": "no_helmet",
+    "Без жилета": "no_vest",
+    "Без перчаток": "no_gloves"
+}
+
+SORT_FIELD_MAP = {
+    "Дата": "date",
+    "Время": "time",
+    "ID нарушителя": "human_id",
+    "Тип нарушения": "violation_type",
+    "Вероятность": "confidence"
+}
+
+SORT_ORDER_MAP = {
+    "По возрастанию": "ASC",
+    "По убыванию": "DESC"
+}
 
 class ViolationLogsTab(QWidget):
+
     def __init__(self, logger, main_log_path):
         super().__init__()
+
         self.pagination = None
         self.refresh_btn = None
         self.per_page_combo = None
         self.filter_panel = None
-        self.logger = logger
-        self.master_log_path = main_log_path
+        self.logger = SQLiteLogger(db_path='../../logs/violations.db',)
         self._session_merged = False
 
-        self.logger = logger
         self.data_loaded = False
         self.current_filtered_data = []
         self.current_page = 1
+        self.total_records = 0
+        self.current_page = 1
+
+        self._loading = False
+        self._initializing = True
         self.init_ui()
+        self._initializing = False
+
+        self._load_page()
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
@@ -84,6 +108,7 @@ class ViolationLogsTab(QWidget):
         self.per_page_combo = QComboBox()
         self.per_page_combo.addItems(["10", "25", "50", "100"])
         self.per_page_combo.setCurrentText("25")
+        self.per_page_combo.currentTextChanged.connect(self._on_per_page_changed)
         self.per_page_combo.setFixedWidth(80)
 
         per_page_layout.addWidget(label)
@@ -98,7 +123,7 @@ class ViolationLogsTab(QWidget):
 
         self.refresh_btn.setIconSize(QSize(24, 24))
         self.refresh_btn.setToolTip("Обновить")
-        self.refresh_btn.clicked.connect(self.reload_logs)
+        self.refresh_btn.clicked.connect(self._load_page)
 
         self.pagination = PaginationPanel()
         pages_reload_layout = QHBoxLayout()
@@ -115,222 +140,175 @@ class ViolationLogsTab(QWidget):
         center_layout.addStretch()
         pages_reload_layout.addLayout(center_layout, stretch=2)
         self.pagination.pageChanged.connect(self._on_page_changed)
-        self.per_page_combo.currentTextChanged.connect(self._on_per_page_changed)
         right_layout = QHBoxLayout()
         right_layout.addStretch()
         pages_reload_layout.addLayout(right_layout, stretch=1)
 
         log_layout.addLayout(pages_reload_layout)
 
-    def load_logs_once(self):
-        if not self.data_loaded:
-            self.reload_logs()
-            self.data_loaded = True
+    def _on_sort_changed(self, column_index):
+        column_map = {
+            0: "date",
+            1: "time",
+            3: "type",
+            4: "confidence",
+            5: "camera"
+        }
 
-    def reload_logs(self):
-        self.all_logs = []
-        master_log_path = self.master_log_path
-        if hasattr(self, 'logger') and self.logger is not None:
-            try:
-                self.logger.flush()
-            except Exception as e:
-                print(f"[WARNING] Ошибка при flush логгера: {e}")
-        all_records = []
+        if column_index not in column_map:
+            return
 
-        if os.path.exists(master_log_path):
-            try:
-                with open(master_log_path, 'r', encoding='utf-8') as f:
-                    reader = csv.DictReader(f)
-                    all_records.extend(list(reader))
-            except Exception as e:
-                print(f"[ERROR] Не удалось прочитать main_log: {e}")
+        new_sort = column_map[column_index]
 
-        if hasattr(self, 'logger') and self.logger is not None:
-            session_file = self.logger.get_file_path()
-            if os.path.exists(session_file):
-                try:
-                    with open(session_file, 'r', encoding='utf-8') as f:
-                        reader = csv.DictReader(f)
-                        all_records.extend(list(reader))
-                except Exception as e:
-                    print(f"[ERROR] Не удалось прочитать сессионный лог: {e}")
+        if self.sort_by == new_sort:
+            self.sort_order = "ASC" if self.sort_order == "DESC" else "DESC"
+        else:
+            self.sort_by = new_sort
+            self.sort_order = "DESC"
 
-        self.all_logs = all_records
-        self.data_loaded = True
-        self.display_filtered_logs({})
+        self._load_page()
+
 
     def apply_filters(self):
+        if self._loading:
+            return
         try:
-            params = self.filter_panel.get_filter_params()
-            self.display_filtered_logs(params)
+            self.current_page = 1
+            self._load_page()
         except Exception as e:
             import traceback
             traceback.print_exc()
 
     def reset_filters(self):
-        self.display_filtered_logs({})
+        if self._loading:
+            return
+        self.filter_panel.date_from.setDate(QDate.currentDate().addMonths(-1))
+        self.filter_panel.date_to.setDate(QDate.currentDate())
+
+        self.filter_panel.time_from.setTime(QTime(0, 0))
+        self.filter_panel.time_to.setTime(QTime(23, 59))
+
+        self.filter_panel.prob_slider.slider_min.setValue(0)
+        self.filter_panel.prob_slider.slider_max.setValue(100)
+
+        self.current_page = 1
+        self._load_page()
 
     def safe_str(value):
         return str(value) if value is not None else ""
 
-    def display_filtered_logs(self, params):
+    def _load_page(self):
+        if self._loading:
+            return
+        self._loading = True
         try:
-            filtered = self.all_logs.copy()
+            all_data = self.logger.get_violations(limit=10)
+            per_page = int(self.per_page_combo.currentText())
+            offset = (self.current_page - 1) * per_page
+            params = self.filter_panel.get_filter_params()
 
-            if params.get("violations"):
-                violation_set = set(params["violations"])
-                filtered = [
-                    row for row in filtered
-                    if self.violation_matches(row, violation_set)
-                ]
+            camera_id = None
+            if params["cameras"]:
+                if len(params["cameras"]) != self.filter_panel.camera_combo.count():
+                    camera_id = params["cameras"]
 
-            selected_cameras = params.get("cameras", [])
-            if selected_cameras:
-                filtered = [
-                    row for row in filtered
-                    if self.camera_matches(row.get("camera_id", ""), selected_cameras)
-                ]
+            violation_type = None
+            if params["violations"]:
+                if len(params["violations"]) != self.filter_panel.type_combo.count():
+                    violation_type = [VIOLATION_MAP[v] for v in params["violations"]]
 
-            if "date_from" in params and "date_to" in params:
-                date_from = params["date_from"]
-                date_to = params["date_to"]
-                filtered = [
-                    row for row in filtered
-                    if date_from <= self.parse_date(row.get("date", "")) <= date_to
-                ]
+            start_date = params["date_from"].strftime("%Y-%m-%d")
+            end_date = params["date_to"].strftime("%Y-%m-%d")
 
-            if "time_from" in params and "time_to" in params:
-                time_from = params["time_from"]
-                time_to = params["time_to"]
-                filtered = [
-                    row for row in filtered
-                    if time_from <= self.parse_time(row.get("processing_time", "")) <= time_to
-                ]
+            start_time = params["time_from"].strftime("%H:%M:%S")
+            end_time = params["time_to"].strftime("%H:%M:%S")
 
-            if "prob_min" in params and "prob_max" in params:
-                pmin, pmax = params["prob_min"], params["prob_max"]
-                filtered = [
-                    row for row in filtered
-                    if pmin <= self.parse_probability(row.get("violation_probability", "0")) <= pmax
-                ]
+            min_conf = params["prob_min"]
+            max_conf = params["prob_max"]
 
-            if "sort_field" in params:
-                sort_key_map = {
-                    "Дата": lambda r: self.parse_date(r.get("date", "")),
-                    "Время": lambda r: self.parse_time(r.get("processing_time", "")),
-                    "ID нарушителя": lambda r: self.natural_sort_key(r.get("human_id", "")),
-                    "Тип нарушения": lambda r: r.get("violation_type", ""),
-                    "Вероятность": lambda r: self.parse_probability(r.get("violation_probability", "0")),
-                    "ID камеры": lambda r: "CAM_001",
-                }
-                key_func = sort_key_map.get(params["sort_field"], lambda r: r.get("date", ""))
-                reverse = (params.get("sort_order", "") == "По убыванию")
-                try:
-                    filtered.sort(key=key_func, reverse=reverse)
-                except Exception as e:
-                    print("Ошибка сортировки:", e)
+            sort_by = SORT_FIELD_MAP.get(params["sort_field"], "date")
+            sort_order = SORT_ORDER_MAP.get(params["sort_order"], "DESC")
 
-            self.current_filtered_data = filtered
-            self.current_page = 1
-            self._apply_pagination()
-        except:
-            import traceback
-            traceback.print_exc()
+            data = self.logger.get_violations(
+                limit=per_page,
+                offset=offset,
+                camera_id=camera_id,
+                violation_type=violation_type,
+                start_date=start_date,
+                end_date=end_date,
+                start_time=start_time,
+                end_time=end_time,
+                min_confidence=min_conf,
+                max_confidence=max_conf,
+                sort_by=sort_by,
+                sort_order=sort_order
+            )
+            print(data)
+
+            self.total_records = self.logger.get_violations_count(
+                camera_id=camera_id,
+                violation_type=violation_type,
+                start_date=start_date,
+                end_date=end_date,
+                start_time=start_time,
+                end_time=end_time,
+                min_confidence=min_conf,
+                max_confidence=max_conf
+            )
+            print(self.total_records)
+            self._update_table(data)
+            self._update_pagination(per_page)
+        finally:
+            self._loading = False
+
+    def _update_table(self, data):
+        self.table.setRowCount(len(data))
+
+        for row_idx, row in enumerate(data):
+            self.table.setItem(row_idx, 0, QTableWidgetItem(str(row.get("date", ""))))
+            self.table.setItem(row_idx, 1, QTableWidgetItem(str(row.get("time", ""))))
+            self.table.setItem(row_idx, 2, QTableWidgetItem(str(row.get("human_id", ""))))
+
+            violation_display = {
+                "no_helmet": "Без каски",
+                "no_vest": "Без жилета",
+                "no_gloves": "Без перчаток"
+            }.get(row.get("violation_type", ""), row.get("violation_type", ""))
+
+            self.table.setItem(row_idx, 3, QTableWidgetItem(violation_display))
+            self.table.setItem(row_idx, 4, QTableWidgetItem(str(row.get("confidence", ""))))
+            self.table.setItem(row_idx, 5, QTableWidgetItem(str(row.get("camera_id", ""))))
+            self.table.setItem(row_idx, 6, QTableWidgetItem(str(row.get("screenshot_path", ""))))
+
+    def _update_pagination(self, per_page):
+        total_pages = max(1, (self.total_records + per_page - 1) // per_page)
+        self.pagination.pageChanged.disconnect()
+        self.pagination.set_total_pages(total_pages)
+        self.pagination.set_current_page(self.current_page)
+        self.pagination.pageChanged.connect(self._on_page_changed)
 
     def _apply_pagination(self):
-        self.per_page_combo.blockSignals(True)
-        self.pagination.pageChanged.disconnect(self._on_page_changed)
-
-        try:
-            per_page = int(self.per_page_combo.currentText())
-            total = len(self.current_filtered_data)
-            total_pages = max(1, (total + per_page - 1) // per_page)
-
-            self.pagination.set_total_pages(total_pages)
-            self.pagination.set_current_page(self.current_page)
-
-            start = (self.current_page - 1) * per_page
-            end = start + per_page
-            page_data = self.current_filtered_data[start:end]
-
-            self.table.setRowCount(len(page_data))
-            for row_idx, row in enumerate(page_data):
-                self.table.setItem(row_idx, 0, QTableWidgetItem(str(row.get("date", "") or "")))
-                self.table.setItem(row_idx, 1, QTableWidgetItem(str(row.get("processing_time", "") or "")))
-                self.table.setItem(row_idx, 2, QTableWidgetItem(str(row.get("human_id", "") or "")))
-                violation_type_raw = row.get("violation_type", "") or ""
-                violation_display = {
-                    "no_helmet": "Без каски",
-                    "no_vest": "Без жилета",
-                    "no_gloves": "Без перчаток"
-                }.get(violation_type_raw, violation_type_raw)
-                self.table.setItem(row_idx, 3, QTableWidgetItem(str(violation_display)))
-                self.table.setItem(row_idx, 4, QTableWidgetItem(str(row.get("violation_probability", "") or "")))
-                camera_id = row.get("camera_id", "")
-                self.table.setItem(row_idx, 5, QTableWidgetItem(str(camera_id) if camera_id else ""))
-                self.table.setItem(row_idx, 6, QTableWidgetItem(str(row.get("screenshot_path", "") or "")))
-        finally:
-            self.pagination.pageChanged.connect(self._on_page_changed)
-            self.per_page_combo.blockSignals(False)
+        self._load_page()
 
     def _on_page_changed(self, page: int):
+        if self._loading:
+            return
         self.current_page = page
         self._apply_pagination()
 
     def _on_per_page_changed(self, text: str):
+        if self._loading or self._initializing:
+            return
         self.current_page = 1
         self._apply_pagination()
-
-    def natural_sort_key(self, s):
-        import re
-        return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
-
-    def parse_date(self, date_str):
-        try:
-            return datetime.strptime(date_str, "%Y-%m-%d").date()
-        except (ValueError, TypeError):
-            return None
-
-    def parse_time(self, time_str):
-        try:
-            if '.' in time_str:
-                time_str = time_str.split('.')[0]
-            h, m, s = map(int, time_str.split(':'))
-            return dt_time(h, m, s)
-        except (ValueError, TypeError):
-            return dt_time.min
-
-    def parse_probability(self, prob_str):
-        try:
-            return float(prob_str)
-        except:
-            return 0.0
-
-    def violation_matches(self, row, allowed_violations):
-        violation_map = {
-            "no_helmet": "Без каски",
-            "no_vest": "Без жилета",
-            "no_gloves": "Без перчаток"
-        }
-
-        violation_code = row.get("violation_type", "").strip()
-        if not violation_code:
-            return False
-
-        displayed_name = violation_map.get(violation_code)
-        if not displayed_name:
-            return False
-
-        return displayed_name in allowed_violations
-
 
     def download_report(self):
         try:
             if self.filter_panel.full_report_radio.isChecked():
-                data_to_export = self.all_logs
+                data_to_export = self.logger.get_violations(limit=10000)
                 report_name = "Полный отчёт"
             else:
-                data_to_export = self.current_filtered_data
+                data_to_export = self.logger.get_violations(limit=10000)
                 report_name = "Отфильтрованный отчёт"
 
             max_records = self.filter_panel.record_count.value()
@@ -369,17 +347,7 @@ class ViolationLogsTab(QWidget):
             from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать отчёт:\n{str(e)}")
 
-    def camera_matches(self, camera_id, selected_cameras):
-        if not camera_id:
-            return False
-        for selected in selected_cameras:
-            if selected == "Веб-камера" and camera_id == "Camera":
-                return True
-            elif selected == "Видео" and not camera_id.startswith("rtsp") and camera_id != "Camera" and camera_id != "":
-                return True
-            elif camera_id == selected:
-                return True
-        return False
+
 
 class PaddingDelegate(QStyledItemDelegate):
     def __init__(self, left=8, parent=None):
@@ -389,4 +357,4 @@ class PaddingDelegate(QStyledItemDelegate):
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
         option.displayAlignment = Qt.AlignVCenter | Qt.AlignLeft
-        option.text = " " * (self.left // 2) + option.text
+        option.text = " " * (self.left // 2) + (option.text or "")

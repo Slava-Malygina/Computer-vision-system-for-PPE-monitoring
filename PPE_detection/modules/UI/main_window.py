@@ -162,7 +162,8 @@ class MainWindow(QMainWindow):
 
     def on_tab_changed(self, index):
         if self.tab_widget.widget(index) == self.violation_logs_tab:
-            self.violation_logs_tab.load_logs_once()
+            self.violation_logs_tab._load_page()
+
 
     def closeEvent(self, event):
         self._safe_exit()

@@ -40,9 +40,7 @@ class FilterPanel(QWidget):
         camera_layout.addWidget(self.camera_combo)
         filter_layout.addLayout(camera_layout)
 
-
         type_label = QLabel("По нарушению:")
-        self.type_combo = QComboBox()
         self.type_combo = CheckableComboBox()
         self.type_combo.addItem("Без каски", checked=True)
         self.type_combo.addItem("Без жилета", checked=True)
