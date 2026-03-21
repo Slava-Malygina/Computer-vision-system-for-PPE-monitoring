@@ -38,7 +38,7 @@ class MonitoringTab(QWidget):
         self.frame_counter = 0
         self.processing_frame = False
         self.last_detection_time = 0
-        self.detection_interval = 0.5
+        self.detection_interval = 0.05
         self.next_track_id = 0
         self.last_detections = []
         self.last_tracks = []
@@ -424,7 +424,6 @@ class MonitoringTab(QWidget):
                 QMessageBox.warning(self, "Warning", "Нет настроенных RTSP-камер. Добавьте адреса.")
                 return
 
-            self.camera_manager.start_all()
             self.multi_camera_mode = True
             self.multi_camera_widget.setVisible(True)
             self.multi_camera_widget.set_camera_count(len(active_addresses))
@@ -522,6 +521,7 @@ class MonitoringTab(QWidget):
 
     def on_detection_done(self, detections, frame, frame_counter, results, source_id):
         try:
+            print(detections)
             violations = []
             tracks = self.simple_tracking(detections)
 
@@ -558,8 +558,10 @@ class MonitoringTab(QWidget):
         finally:
             self.processing_frame = False
 
-    def on_camera_frame(self, camera_index, frame):
+    def on_camera_frame(self, camera_index, frame, source_id):
+        print(f"on_camera_frame: camera_index={camera_index}, source_id={source_id}")
         self.camera_original_frames[camera_index] = frame
+
 
         if camera_index not in self.camera_displayed_frames:
             self.multi_camera_widget.update_frame(camera_index, frame)
@@ -576,10 +578,13 @@ class MonitoringTab(QWidget):
 
                 detection_thread = DetectionThread(
                     self.model, frame, self.conf_slider.value() / 100.0, self.frame_counter
-                )
+                , source_id=source_id)
+                print(source_id)
                 detection_thread.detection_done.connect(
-                    lambda det, frm, cnt, res, idx=camera_index: self.on_camera_detection_done(idx, det, frm, cnt, res)
+                    lambda det, frm, cnt, res, src_id, idx=camera_index: self.on_camera_detection_done(idx, det, frm,
+                                                                                                       cnt, res,src_id)
                 )
+
                 detection_thread.finished.connect(lambda: self._remove_detection_thread(detection_thread))
                 self.detection_threads.append(detection_thread)
                 detection_thread.start()
@@ -588,12 +593,19 @@ class MonitoringTab(QWidget):
         if thread in self.detection_threads:
             self.detection_threads.remove(thread)
 
-    def on_camera_detection_done(self, camera_index, detections, frame, frame_counter, results):
+    def on_camera_detection_done(self, camera_index, detections, frame, frame_counter, results, source_id=None):
+        if camera_index not in self.camera_detection_in_progress:
+            print(f"Warning: camera_index {camera_index} not in detection_in_progress")
+            return
+
         try:
+            print(f"Camera {camera_index} detection done, source_id: {source_id}, detections: {len(detections)}")
             display_frame = frame.copy()
+            print(camera_index)
             self.draw_detections_on_frame_simple(display_frame, detections)
             self.camera_displayed_frames[camera_index] = display_frame
             self.multi_camera_widget.update_frame(camera_index, display_frame)
+
         except Exception as e:
             print(f"Multi-camera detection error for camera {camera_index}: {e}")
         finally:
@@ -627,8 +639,7 @@ class MonitoringTab(QWidget):
 
     def on_camera_fps(self, camera_index, fps):
         self.camera_fps[camera_index] = fps
-        status = self.camera_status.get(camera_index, "")
-        self.multi_camera_widget.update_status(camera_index, status, fps)
+        self.multi_camera_widget.update_fps(camera_index, fps)
 
     def simple_tracking(self, detections, iou_threshold=0.3):
         current_tracks = []
@@ -969,9 +980,9 @@ class MonitoringTab(QWidget):
         for ui_idx, addr in enumerate(active_addresses):
             manager_idx = self.camera_manager.add_camera("rtsp", addr)
             self.camera_index_map[ui_idx] = manager_idx
-
+            print(f"Synced: ui_idx={ui_idx}, manager_idx={manager_idx}, addr={addr}")
             self.camera_manager.get_frame_ready_signal(manager_idx).connect(
-                lambda frame, idx=ui_idx: self.on_camera_frame(idx, frame))
+                lambda frame, source_path, idx=ui_idx: self.on_camera_frame(idx, frame, source_path))
             self.camera_manager.get_status_signal(manager_idx).connect(
                 lambda status, idx=ui_idx: self.on_camera_status(idx, status))
 
