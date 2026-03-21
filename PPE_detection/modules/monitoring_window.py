@@ -1,42 +1,42 @@
 import os
-import cv2
-from datetime import datetime
-import pandas as pd
-from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QListWidget, QSlider, QMessageBox, QSplitter, QComboBox, QFileDialog, QProgressBar, QGroupBox, QLineEdit
-from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtWidgets import QSizePolicy
 import time
+from datetime import datetime
 
-from modules.UI.rtsp_config_dialog import RtspConfigDialog
+from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtWidgets import QSizePolicy
+from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QListWidget, QSlider, QMessageBox, \
+    QSplitter, QComboBox, QFileDialog, QProgressBar, QGroupBox, QLineEdit
+
 from modules.UI.multi_camera_widget import MultiCameraWidget
+from modules.UI.rtsp_config_dialog import RtspConfigDialog
 from modules.UI.video_errors import show_error, show_rtsp_error
 from modules.camera_manager import CameraManager
-from modules.database.sqlite_logger import SQLiteLogger
-from modules.detection_thread import DetectionThread
 from modules.utils.threshold_manager import ThresholdManager
-
+from modules.utils.tracking_utils import TrackingManager, draw_detections_on_frame_with_tracking, \
+    draw_detections_on_frame
+from modules.utils.ui_handler import UIHandler
+from modules.utils.video_processor import VideoProcessor
 from modules.video_thread import VideoThread
-from modules.violation_detector import ViolationDetector, _iou
-from modules.model_loader import ModelLoader
+from modules.violation_detector import ViolationDetector
 
 
 class MonitoringTab(QWidget):
     def __init__(self, logger):
         super().__init__()
-        self.model = None
         self.single_video_thread = None
         self.detection_thread = None
         self.detection_threads = []
         self.current_frame = None
-        self.is_detecting = False
+        self.frame_counter = 0
         self.thresholdManager = ThresholdManager()
-        self.violations_log = []
+        self.tracking_manager = TrackingManager()
+        self.camera_manager = CameraManager()
+        self.video_processor = VideoProcessor(logger, self.camera_manager, self.frame_counter)
+
         self.available_cameras = []
         self.violation_detector = ViolationDetector()
         self.violation_logger = logger
-        self.track_history = []
-        self.frame_counter = 0
+
         self.processing_frame = False
         self.last_detection_time = 0
         self.detection_interval = 1
@@ -48,7 +48,6 @@ class MonitoringTab(QWidget):
 
         self.multi_camera_mode = False
         self.camera_detection_in_progress = {}
-
 
         self.camera_fps = {}
         self.camera_status = {}
@@ -63,12 +62,21 @@ class MonitoringTab(QWidget):
         self.camera_displayed_frames = {}
 
         self.init_ui()
+        if self.video_processor.load_model():
+            self.model_label.setText("Модель: загружена")
         self.detect_cameras()
         self.setup_timers()
-        self.load_model()
         self.rtsp_addresses = [""] * RtspConfigDialog.MAX_SOURCES
-        self.camera_manager = CameraManager()
+
         self.camera_index_map = {}
+        self.ui_handler = UIHandler(
+            self.multi_camera_widget,
+            self.single_video_label,
+            self.violations_list,
+            self.status_label,
+            self.stats_label,
+            self.conf_label
+        )
         self.set_addr_auto()
 
     def init_ui(self):
@@ -390,33 +398,13 @@ class MonitoringTab(QWidget):
         self.stop_video()
 
         if source_type == 'camera':
-            source_path = "camera"
-            self.single_video_thread = VideoThread(source_type, source_path)
-            self.single_video_thread.frame_ready.connect(self.on_frame_received)
-            self.single_video_thread.status_update.connect(self.status_label.setText)
-            self.single_video_thread.progress_update.connect(self.progress_bar.setValue)
-            self.single_video_thread.finished_signal.connect(self.on_video_finished)
-            self.single_video_thread.error_occurred.connect(self.on_single_video_error)
-            self.single_video_thread.start()
-            self.progress_bar.setVisible(False)
-            self.single_video_label.setVisible(True)
-            self.multi_camera_widget.setVisible(False)
+            self._start_single_video(source_type, "camera")
 
         elif source_type == 'video':
             if not hasattr(self, 'current_video_path') or not self.current_video_path:
-                QMessageBox.warning(self, "Warning", "Please select a video file first!")
+                QMessageBox.warning(self, "Warning", "Выберите видеофайл!")
                 return
-            source_path = self.current_video_path
-            self.single_video_thread = VideoThread(source_type, source_path)
-            self.single_video_thread.frame_ready.connect(self.on_frame_received)
-            self.single_video_thread.status_update.connect(self.status_label.setText)
-            self.single_video_thread.progress_update.connect(self.progress_bar.setValue)
-            self.single_video_thread.finished_signal.connect(self.on_video_finished)
-            self.single_video_thread.error_occurred.connect(self.on_single_video_error)
-            self.single_video_thread.start()
-            self.progress_bar.setVisible(True)
-            self.single_video_label.setVisible(True)
-            self.multi_camera_widget.setVisible(False)
+            self._start_single_video(source_type, self.current_video_path)
 
         elif source_type == 'rtsp':
             active_addresses = [addr for addr in self.rtsp_addresses if addr]
@@ -448,18 +436,10 @@ class MonitoringTab(QWidget):
 
         self.camera_manager.stop_all()
         self.multi_camera_mode = False
-        self.camera_detection_in_progress.clear()
-        self.camera_last_detection_time.clear()
-        self.camera_original_frames.clear()
-        self.camera_displayed_frames.clear()
 
-        for thread in self.detection_threads:
-            if thread.isRunning():
-                thread.wait(1000)
-        self.detection_threads.clear()
+        self._clear_camera_state()
 
-        if self.detection_thread and self.detection_thread.isRunning():
-            self.detection_thread.wait(1000)
+        self._stop_detection_threads()
 
         self.display_timer.stop()
 
@@ -469,7 +449,7 @@ class MonitoringTab(QWidget):
         self.stop_detection_btn.setEnabled(False)
 
         self.single_video_label.setText("\n\nВыберите источник видеопотока")
-        self.status_label.setText("")
+        self.ui_handler.update_status("")
         self.fps_label.setText("FPS: 0")
         self.progress_bar.setVisible(False)
 
@@ -478,10 +458,10 @@ class MonitoringTab(QWidget):
 
     def on_video_finished(self):
         self.stop_video()
-        self.status_label.setText("Завершено")
+        self.ui_handler.update_status("Завершено")
 
     def on_single_video_error(self, error_code: str, message: str):
-        self.status_label.setText(f"Ошибка: {message}")
+        self.ui_handler.update_status(f"Ошибка: {message}")
         if error_code in ("rtsp_lost", "rtsp_open_failed"):
             self.handle_rtsp_loss()
             return
@@ -489,40 +469,38 @@ class MonitoringTab(QWidget):
         self.stop_video()
 
     def start_detection(self):
-        if not self.model:
+        if not self.video_processor.model:
             QMessageBox.warning(self, "Warning", "Model not loaded!")
             return
 
-        self.is_detecting = True
-        self.status_label.setText("В процессе")
+        self.video_processor.is_detecting = True
+        self.ui_handler.update_status("В процессе")
         self.start_detection_btn.setEnabled(False)
         self.stop_detection_btn.setEnabled(True)
 
     def stop_detection(self):
-        self.is_detecting = False
+        self.video_processor.is_detecting = False
         self.start_detection_btn.setEnabled(True)
         self.stop_detection_btn.setEnabled(False)
-        self.status_label.setText("Остановлено")
+        self.ui_handler.update_status("Остановлено")
 
     def on_frame_received(self, frame, source_id):
         self.current_frame = frame
 
-        if self.is_detecting and self.model is not None and not self.processing_frame:
+        if self.video_processor.is_detecting and self.video_processor.model is not None and not self.processing_frame:
             current_time = time.time()
             if current_time - self.last_detection_time >= self.detection_interval:
                 self.last_detection_time = current_time
                 self.processing_frame = True
 
-                self.detection_thread = DetectionThread(
-                    self.model, frame, self.conf_slider.value() / 100.0, self.frame_counter, source_id
-                )
-                self.detection_thread.detection_done.connect(self.on_detection_done)
+                self.detection_thread = self._create_detection_thread(frame, source_id)
                 self.detection_thread.start()
+                self.detection_threads.append(self.detection_thread)
 
     def on_detection_done(self, detections, frame, frame_counter, results, source_id):
         try:
             violations = []
-            tracks = self.simple_tracking(detections)
+            tracks = self.tracking_manager.update(detections)
 
             result = self.violation_detector.process_frame(
                 detections, tracks, frame_counter
@@ -531,8 +509,8 @@ class MonitoringTab(QWidget):
             self.last_violations = result['violations_dict']
             self.last_detections = detections
             self.last_tracks = tracks
-            self.frame_counter += 1
 
+            self.video_processor.increment_frame_counter()
             for human_id, human_violations in result['violations_dict'].items():
                 for violation in human_violations:
                     violations.append({
@@ -549,7 +527,7 @@ class MonitoringTab(QWidget):
                     )
 
             for violation in violations:
-                self.add_violation(violation)
+                self.ui_handler.add_violation(violation)
 
         except Exception as e:
             print(f"Detection processing error: {e}")
@@ -560,11 +538,10 @@ class MonitoringTab(QWidget):
 
         self.camera_original_frames[camera_index] = frame
 
-
         if camera_index not in self.camera_displayed_frames:
-            self.multi_camera_widget.update_frame(camera_index, frame)
+            self.ui_handler.update_frame(camera_index, frame)
 
-        if self.is_detecting and self.model is not None:
+        if self.video_processor.is_detecting and self.video_processor.model is not None:
             if self.camera_detection_in_progress.get(camera_index, False):
                 return
 
@@ -573,15 +550,7 @@ class MonitoringTab(QWidget):
             if current_time - last_time >= self.detection_interval:
                 self.camera_last_detection_time[camera_index] = current_time
                 self.camera_detection_in_progress[camera_index] = True
-
-                detection_thread = DetectionThread(
-                    self.model, frame, self.conf_slider.value() / 100.0, self.frame_counter
-                , source_id=source_id)
-                detection_thread.detection_done.connect(
-                    lambda det, frm, cnt, res, src_id, idx=camera_index: self.on_camera_detection_done(idx, det, frm,
-                                                                                                       cnt, res,src_id)
-                )
-
+                detection_thread = self._create_detection_thread(frame, source_id, camera_index)
                 detection_thread.finished.connect(lambda: self._remove_detection_thread(detection_thread))
                 self.detection_threads.append(detection_thread)
                 detection_thread.start()
@@ -598,243 +567,23 @@ class MonitoringTab(QWidget):
         try:
             display_frame = frame.copy()
             print(camera_index)
-            self.draw_detections_on_frame_simple(display_frame, detections)
+            draw_detections_on_frame(display_frame, detections)
             self.camera_displayed_frames[camera_index] = display_frame
-            self.multi_camera_widget.update_frame(camera_index, display_frame)
+            self.ui_handler.update_frame(camera_index, display_frame)
 
         except Exception as e:
             print(f"Multi-camera detection error for camera {camera_index}: {e}")
         finally:
             self.camera_detection_in_progress[camera_index] = False
 
-    def draw_detections_on_frame_simple(self, frame, detections):
-        colors = {
-            'helmet': (0, 255, 0),
-            'vest': (255, 0, 0),
-            'gloves': (0, 255, 255),
-            'human': (255, 0, 255),
-            'person': (255, 0, 255),
-            'head': (255, 255, 0),
-            'body': (0, 165, 255),
-            'palm': (128, 0, 128),
-            'wrist': (255, 165, 0),
-        }
-        for det in detections:
-            x1, y1, x2, y2 = det['bbox']
-            class_name = det['cls']
-            conf = det['conf']
-            color = colors.get(class_name, (255, 255, 255))
-            label = f"{class_name} {conf:.2f}"
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-            cv2.putText(frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
     def on_camera_status(self, camera_index, status):
         self.camera_status[camera_index] = status
         fps = self.camera_fps.get(camera_index)
-        self.multi_camera_widget.update_status(camera_index, status, fps)
 
     def on_camera_fps(self, camera_index, fps):
         self.camera_fps[camera_index] = fps
-        self.multi_camera_widget.update_fps(camera_index, fps)
-
-    def simple_tracking(self, detections, iou_threshold=0.3):
-        current_tracks = []
-        used_track_ids = set()
-        current_time = time.time()
-
-        self.track_history = [track for track in self.track_history
-                              if current_time - track[5] < 30.0]
-
-        person_detections = [det for det in detections if det['cls'] in ['person']]
-
-        active_tracks = [track for track in self.track_history
-                         if current_time - track[5] < 5.0]
-        inactive_tracks = [track for track in self.track_history
-                           if current_time - track[5] >= 5.0]
-
-        unmatched_detections = []
-
-        for det in person_detections:
-            x1, y1, x2, y2 = det['bbox']
-            det_box = [x1, y1, x2, y2]
-            det_center = ((x1 + x2) / 2, (y1 + y2) / 2)
-
-            best_match = None
-            best_score = 0
-
-            for track in active_tracks:
-                track_box = [track[0], track[1], track[2], track[3]]
-                track_id = track[4]
-
-                if track_id in used_track_ids:
-                    continue
-
-                iou_val = _iou(track_box, det_box)
-
-                track_center = ((track[0] + track[2]) / 2, (track[1] + track[3]) / 2)
-                distance = ((det_center[0] - track_center[0]) ** 2 +
-                            (det_center[1] - track_center[1]) ** 2) ** 0.5
-
-                normalized_distance = max(0, 1 - distance / 300)
-
-                if iou_val > 0.1:
-                    score = iou_val * 0.7 + normalized_distance * 0.3
-                else:
-                    score = normalized_distance * 0.5
-
-                if score > best_score and score > 0.3:
-                    best_score = score
-                    best_match = track
-
-            if best_match:
-                track_id = best_match[4]
-                alpha = 0.3
-                smoothed_x1 = int(alpha * x1 + (1 - alpha) * best_match[0])
-                smoothed_y1 = int(alpha * y1 + (1 - alpha) * best_match[1])
-                smoothed_x2 = int(alpha * x2 + (1 - alpha) * best_match[2])
-                smoothed_y2 = int(alpha * y2 + (1 - alpha) * best_match[3])
-
-                current_tracks.append((smoothed_x1, smoothed_y1, smoothed_x2, smoothed_y2, track_id, current_time))
-                used_track_ids.add(track_id)
-            else:
-                unmatched_detections.append(det)
-
-        remaining_detections = []
-
-        for det in unmatched_detections:
-            x1, y1, x2, y2 = det['bbox']
-            det_box = [x1, y1, x2, y2]
-            det_center = ((x1 + x2) / 2, (y1 + y2) / 2)
-
-            best_match = None
-            best_score = 0
-
-            for track in inactive_tracks:
-                track_box = [track[0], track[1], track[2], track[3]]
-                track_id = track[4]
-
-                if track_id in used_track_ids:
-                    continue
-
-                iou_val = _iou(track_box, det_box)
-
-                track_center = ((track[0] + track[2]) / 2, (track[1] + track[3]) / 2)
-                distance = ((det_center[0] - track_center[0]) ** 2 +
-                            (det_center[1] - track_center[1]) ** 2) ** 0.5
-
-                normalized_distance = max(0, 1 - distance / 400)
-
-                score = iou_val * 0.6 + normalized_distance * 0.4
-
-                if score > best_score and score > 0.4:
-                    best_score = score
-                    best_match = track
-
-            if best_match:
-                track_id = best_match[4]
-                current_tracks.append((x1, y1, x2, y2, track_id, current_time))
-                used_track_ids.add(track_id)
-            else:
-                remaining_detections.append(det)
-
-        for det in remaining_detections:
-            x1, y1, x2, y2 = det['bbox']
-
-            is_duplicate = False
-            det_box = [x1, y1, x2, y2]
-            det_center = ((x1 + x2) / 2, (y1 + y2) / 2)
-
-            for existing_track in current_tracks:
-                existing_box = [existing_track[0], existing_track[1], existing_track[2], existing_track[3]]
-                existing_center = ((existing_track[0] + existing_track[2]) / 2,
-                                   (existing_track[1] + existing_track[3]) / 2)
-
-                iou_val = _iou(existing_box, det_box)
-                distance = ((det_center[0] - existing_center[0]) ** 2 +
-                            (det_center[1] - existing_center[1]) ** 2) ** 0.5
-
-                if iou_val > 0.5 or distance < 50:
-                    is_duplicate = True
-                    break
-
-            if not is_duplicate:
-                self.next_track_id += 1
-                track_id = self.next_track_id
-                current_tracks.append((x1, y1, x2, y2, track_id, current_time))
-                used_track_ids.add(track_id)
-
-        updated_history = []
-
-        for track in current_tracks:
-            updated_history.append(track)
-
-        for track in active_tracks:
-            if track[4] not in used_track_ids and current_time - track[5] < 5.0:
-                updated_history.append(track)
-
-        inactive_to_keep = [track for track in inactive_tracks
-                            if track[4] not in used_track_ids and current_time - track[5] < 15.0]
-        updated_history.extend(inactive_to_keep[:5])
-
-        self.track_history = updated_history
-
-        return [(x1, y1, x2, y2, track_id) for x1, y1, x2, y2, track_id, _ in current_tracks]
-
-    def draw_detections_on_frame(self, frame, detections, tracks, violations_dict):
-        display_frame = frame.copy()
-
-        colors = {
-            'helmet': (0, 255, 0),
-            'vest': (255, 0, 0),
-            'gloves': (0, 255, 255),
-            'human': (255, 0, 255),
-            'person': (255, 0, 255),
-            'head': (255, 255, 0),
-            'body': (0, 165, 255),
-            'palm': (128, 0, 128),
-            'wrist': (255, 165, 0),
-        }
-
-        for det in detections:
-            x1, y1, x2, y2 = det['bbox']
-            class_name = det['cls']
-            conf = det['conf']
-
-            color = colors.get(class_name, (255, 255, 255))
-            label = f"{class_name} {conf:.2f}"
-
-            cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
-            cv2.putText(display_frame, label, (x1, y1 - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-
-        for x1, y1, x2, y2, track_id in tracks:
-            human_id = f'human_{track_id}'
-            track_color = (0, 255, 255)
-
-            if human_id in violations_dict:
-                violations_list = violations_dict[human_id]
-                if any(v['violation_type'] == 'no_helmet' for v in violations_list):
-                    track_color = (0, 0, 255)
-                elif any(v['violation_type'] == 'no_vest' for v in violations_list):
-                    track_color = (0, 165, 255)
-                elif any(v['violation_type'] == 'no_gloves' for v in violations_list):
-                    track_color = (255, 0, 0)
-
-            cv2.rectangle(display_frame, (x1, y1), (x2, y2), track_color, 2)
-
-            violation_text = ""
-            if human_id in violations_dict:
-                violations_list = violations_dict[human_id]
-                violation_text = " | ".join([v['violation_type'] for v in violations_list])
-
-            display_text = f"ID:{track_id}"
-            if violation_text:
-                display_text += f" | {violation_text}"
-
-            cv2.putText(display_frame, display_text, (x1, y1 - 20),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, track_color, 2)
-
-        return display_frame
+        self.ui_handler.update_fps(camera_index, fps)
 
     def update_display(self):
         self.fps_counter += 1
@@ -848,64 +597,26 @@ class MonitoringTab(QWidget):
             display_frame = self.current_frame.copy()
 
             if hasattr(self, 'last_detections') and hasattr(self, 'last_tracks'):
-                display_frame = self.draw_detections_on_frame(
+                display_frame = draw_detections_on_frame_with_tracking(
                     display_frame,
                     self.last_detections,
                     self.last_tracks,
                     self.last_violations
                 )
 
-            self.display_frame(display_frame)
+            self.ui_handler.update_single_frame(display_frame)
 
-    def display_frame(self, frame):
-        try:
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            h, w, ch = frame_rgb.shape
-            bytes_per_line = ch * w
-
-            qt_image = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
-            pixmap = QPixmap.fromImage(qt_image)
-
-            scaled_pixmap = pixmap.scaled(
-                self.single_video_label.width() - 10,
-                self.single_video_label.height() - 10,
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
-            )
-            self.single_video_label.setPixmap(scaled_pixmap)
-
-        except Exception as e:
-            print(f"Display error: {e}")
-
-    def add_violation(self, violation):
-        self.violations_log.append(violation)
-
-        timestamp = violation['timestamp']
-        violation_type = violation['class']
-        confidence = violation['confidence']
-        human_id = violation['human_id']
-
-        log_entry = f"[{timestamp}] {violation_type} (ID: {human_id}) - {confidence}"
-
-        self.violations_list.addItem(log_entry)
-        self.violations_list.scrollToBottom()
-
-        unique_violations = len(self.violations_log)
-        self.stats_label.setText(f"Нарушения: {unique_violations}")
 
     def clear_journal(self):
-        self.violations_list.clear()
-        self.violations_log.clear()
+        self.ui_handler.clear_journal()
         self.violation_detector.clear_recorded_violations()
         self.last_violations.clear()
-        self.track_history.clear()
-        self.next_track_id = 0
-        self.stats_label.setText("Нарушения 0")
-
+        self.tracking_manager.clear()
 
     def on_confidence_changed(self, value):
         conf_value = value / 100.0
-        self.conf_label.setText(f"{conf_value:.2f}")
+        self.video_processor.set_conf_threshold(conf_value)
+        self.ui_handler.update_confidence_label(conf_value)
 
     def closeEvent(self, event):
         self.stop_video()
@@ -919,15 +630,6 @@ class MonitoringTab(QWidget):
         self.fps_counter = 0
         self.last_fps_time = time.time()
 
-    def load_model(self):
-        try:
-            loader = ModelLoader()
-            self.model = loader.load()
-            if self.model:
-                self.model_label.setText(f"Модель: {loader.model_name}")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Cannot load model: {e}")
-            self.model = None
 
     def handle_rtsp_loss(self):
         action = show_rtsp_error(self, "rtsp_lost")
@@ -954,12 +656,7 @@ class MonitoringTab(QWidget):
 
     def _sync_cameras_with_addresses(self, new_addresses: list):
         self.camera_manager.stop_all()
-        self.camera_last_frame.clear()
-        self.camera_last_displayed_frame.clear()
-        self.camera_last_detections.clear()
-        self.camera_detection_in_progress.clear()
-        self.camera_last_detection_time.clear()
-
+        self._clear_camera_state()
         for manager_idx in self.camera_index_map.values():
             try:
                 self.camera_manager.get_frame_ready_signal(manager_idx).disconnect()
@@ -996,3 +693,47 @@ class MonitoringTab(QWidget):
             self.multi_camera_widget.set_camera_count(len(active_addresses))
         else:
             self.multi_camera_widget.setVisible(False)
+
+    def _create_detection_thread(self, frame, source_id, camera_index=None):
+        thread = self.video_processor.create_detection_thread(frame, source_id, camera_index)
+        if camera_index is not None:
+            thread.detection_done.connect(
+                lambda det, frm, cnt, res, src_id, idx=camera_index:
+                self.on_camera_detection_done(idx, det, frm, cnt, res, src_id)
+            )
+        else:
+            thread.detection_done.connect(self.on_detection_done)
+
+        return thread
+
+    def _clear_camera_state(self):
+        self.camera_detection_in_progress.clear()
+        self.camera_last_detection_time.clear()
+        self.camera_original_frames.clear()
+        self.camera_displayed_frames.clear()
+        self.camera_last_frame.clear()
+        self.camera_last_displayed_frame.clear()
+        self.camera_last_detections.clear()
+
+    def _start_single_video(self, source_type, source_path):
+        """Запуск одиночного видео (камера или файл)"""
+        self.single_video_thread = VideoThread(source_type, source_path)
+        self.single_video_thread.frame_ready.connect(self.on_frame_received)
+        self.single_video_thread.status_update.connect(self.ui_handler.update_status)
+        self.single_video_thread.progress_update.connect(self.progress_bar.setValue)
+        self.single_video_thread.finished_signal.connect(self.on_video_finished)
+        self.single_video_thread.error_occurred.connect(self.on_single_video_error)
+        self.single_video_thread.start()
+
+        self.progress_bar.setVisible(source_type == 'video')
+        self.single_video_label.setVisible(True)
+        self.multi_camera_widget.setVisible(False)
+
+    def _stop_detection_threads(self):
+        for thread in self.detection_threads:
+            if thread.isRunning():
+                thread.wait(1000)
+        self.detection_threads.clear()
+
+        if self.detection_thread and self.detection_thread.isRunning():
+            self.detection_thread.wait(1000)

@@ -112,10 +112,6 @@ class MultiCameraWidget(QWidget):
                 label.setPixmap(QPixmap())
                 label.setText(f"Камера {camera_index + 1}")
 
-    def update_status(self, camera_index, status_text, fps=None):
-        if 0 <= camera_index < len(self._labels):
-            print(f"[Камера {camera_index}] {status_text}" + (f" FPS: {fps}" if fps else ""))
-
     def clear_frame(self, camera_index):
         self.update_frame(camera_index, None)
 
@@ -125,7 +121,7 @@ class MultiCameraWidget(QWidget):
     def clear_all(self):
         for i in range(len(self.cameras)):
             self.update_frame(i, None)
-            self.update_status(i, "", 0)
+
 
     def set_max_width(self, width):
         self.setMaximumWidth(width)
