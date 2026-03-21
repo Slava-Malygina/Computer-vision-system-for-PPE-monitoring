@@ -8,7 +8,6 @@ from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QSizePolicy
 import time
 
-from modules.UI.multi_camera_widget import MultiCameraWidget
 from modules.UI.rtsp_config_dialog import RtspConfigDialog
 from modules.UI.multi_camera_widget import MultiCameraWidget
 from modules.UI.video_errors import show_error, show_rtsp_error
@@ -295,8 +294,6 @@ class MonitoringTab(QWidget):
         result = self.thresholdManager.get_all_rtsp_urls()
         self._sync_cameras_with_addresses(result)
 
-
-
     def on_source_changed(self, index):
         source_type = self.source_combo.currentData()
         self.camera_combo.setVisible(False)
@@ -386,7 +383,7 @@ class MonitoringTab(QWidget):
             source_path = "camera"
             source_path = self.camera_combo.currentData()
             self.single_video_thread = VideoThread(source_type, source_path)
-            self.single_video_thread.frame_ready.connect(self.on_single_frame_received)
+            self.single_video_thread.frame_ready.connect(self.on_frame_received)
             self.single_video_thread.status_update.connect(self.status_label.setText)
             self.single_video_thread.progress_update.connect(self.progress_bar.setValue)
             self.single_video_thread.finished_signal.connect(self.on_video_finished)
@@ -402,7 +399,7 @@ class MonitoringTab(QWidget):
                 return
             source_path = self.current_video_path
             self.single_video_thread = VideoThread(source_type, source_path)
-            self.single_video_thread.frame_ready.connect(self.on_single_frame_received)
+            self.single_video_thread.frame_ready.connect(self.on_frame_received)
             self.single_video_thread.status_update.connect(self.status_label.setText)
             self.single_video_thread.progress_update.connect(self.progress_bar.setValue)
             self.single_video_thread.finished_signal.connect(self.on_video_finished)
@@ -823,12 +820,12 @@ class MonitoringTab(QWidget):
             pixmap = QPixmap.fromImage(qt_image)
 
             scaled_pixmap = pixmap.scaled(
-                self.video_label.width() - 10,
-                self.video_label.height() - 10,
+                self.single_video_label.width() - 10,
+                self.single_video_label.height() - 10,
                 Qt.KeepAspectRatio,
                 Qt.SmoothTransformation
             )
-            self.video_label.setPixmap(scaled_pixmap)
+            self.single_video_label.setPixmap(scaled_pixmap)
 
         except Exception as e:
             print(f"Display error: {e}")
@@ -923,13 +920,13 @@ class MonitoringTab(QWidget):
             self.camera_manager.remove_camera(manager_idx)
         active_addresses = [addr for addr in new_addresses if addr]
         self.camera_index_map.clear()
-
         for ui_idx, addr in enumerate(active_addresses):
             manager_idx = self.camera_manager.add_camera("rtsp", addr)
             self.camera_index_map[ui_idx] = manager_idx
 
             self.camera_manager.get_frame_ready_signal(manager_idx).connect(
-                lambda frame, idx=ui_idx: self.on_camera_frame(idx, frame))
+                lambda frame, source_path, idx=ui_idx: self.on_camera_frame(idx, frame))
+
             self.camera_manager.get_status_signal(manager_idx).connect(
                 lambda status, idx=ui_idx: self.on_camera_status(idx, status))
 
@@ -944,7 +941,6 @@ class MonitoringTab(QWidget):
         self.multi_camera_widget.set_addresses(new_addresses)
 
         if active_addresses:
-            self.multi_camera_widget.setVisible(True)
             self.multi_camera_widget.set_camera_count(len(active_addresses))
         else:
             self.multi_camera_widget.setVisible(False)

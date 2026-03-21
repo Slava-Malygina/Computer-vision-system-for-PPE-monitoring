@@ -31,7 +31,6 @@ class VideoThread(QThread):
         try:
             if self.source_type == 'rtsp':
                 self.status_update.emit("RTSP: подключение...")
-
                 if not self.open_rtsp():
                     self.error_occurred.emit(
                         "rtsp_open_failed",
