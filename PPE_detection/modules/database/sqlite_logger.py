@@ -10,7 +10,7 @@ class SQLiteLogger:
     VALID_VIOLATION_TYPES = {'no_helmet', 'no_vest', 'no_gloves'}
 
     def __init__(self,
-                 db_path: str = '../../db/violations.db',
+                 db_path: str = '/log/violations.db',
                  screenshots_dir: str = '../../violations',
                  max_buffer_size: int = 20):
 
@@ -18,7 +18,6 @@ class SQLiteLogger:
         self.screenshots_dir = screenshots_dir
         self.max_buffer_size = max_buffer_size
 
-        self.buffer = []
         self.lock = Lock()
 
         self.logger = self._setup_logging()
@@ -89,14 +88,14 @@ class SQLiteLogger:
                       confidence: float,
                       camera_id: str,
                       screenshot_path: str = None):
-
         if violation_type not in self.VALID_VIOLATION_TYPES:
+            print(f"[SKIP] invalid type: {violation_type}")
             return False
 
         now = datetime.now()
 
         if screenshot_path is None:
-            screenshot_path = f"{self.screenshots_dir}/{camera_id}_{frame_id}_{int(time.time()*1000)}.jpg"
+            screenshot_path = f"{self.screenshots_dir}/{camera_id}_{frame_id}_{int(time.time() * 1000)}.jpg"
 
         record = (
             now.strftime('%Y-%m-%d'),
@@ -108,22 +107,32 @@ class SQLiteLogger:
             screenshot_path
         )
 
-        with self.lock:
-            self.buffer.append(record)
+        try:
+            self.logger.info(f"[SQL] INSERT {record}")
 
-            if len(self.buffer) >= self.max_buffer_size:
-                self._flush_locked()
+            with self.lock:
+                self.cursor.execute(self.insert_query, record)
+                self.connection.commit()
 
-        return True
+            self.logger.info("[OK] inserted")
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"[ERROR] insert failed: {e}")
+            raise
 
     def add_frame_violations(self, frame_id, violations_dict, camera_id, screenshot_path=None):
         count = 0
-
         for human_key, violations in violations_dict.items():
             try:
-                human_id = int(human_key.split('_')[1])
-            except:
-                continue
+                if isinstance(human_key, str) and "_" in human_key:
+                    human_id = int(human_key.split('_')[1])
+                else:
+                    human_id = int(human_key)
+            except Exception as e:
+                print("LOGGER ERROR:", e)
+                raise
 
             for v in violations:
                 if self.add_violation(
@@ -135,36 +144,14 @@ class SQLiteLogger:
                         screenshot_path
                 ):
                     count += 1
-
+        self.logger.info(f"[FRAME DONE] inserted {count} violations")
         return count
 
-
     def flush(self):
-        with self.lock:
-            return self._flush_locked()
+        pass
 
     def _flush_locked(self):
-        if not self.buffer:
-            return True
-
-        try:
-            self.cursor.execute("BEGIN")
-            self.cursor.executemany(self.insert_query, self.buffer)
-            self.connection.commit()
-
-            self.buffer.clear()
-            return True
-
-        except sqlite3.Error as e:
-            self.logger.error(f"Flush error: {e}")
-            self.connection.rollback()
-
-            try:
-                self._connect()
-            except:
-                pass
-
-            return False
+        pass
 
     def get_violations(self,
                        limit=100,
@@ -306,7 +293,6 @@ class SQLiteLogger:
     def get_count(self) -> int:
         self.cursor.execute("SELECT COUNT(*) as c FROM violations")
         return self.cursor.fetchone()['c']
-
 
     def delete_old_records(self, days=365):
         cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')

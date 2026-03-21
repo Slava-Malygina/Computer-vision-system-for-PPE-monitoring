@@ -12,6 +12,7 @@ from modules.UI.rtsp_config_dialog import RtspConfigDialog
 from modules.UI.multi_camera_widget import MultiCameraWidget
 from modules.UI.video_errors import show_error, show_rtsp_error
 from modules.camera_manager import CameraManager
+from modules.database.sqlite_logger import SQLiteLogger
 from modules.detection_thread import DetectionThread
 from modules.utils.threshold_manager import ThresholdManager
 
@@ -38,7 +39,7 @@ class MonitoringTab(QWidget):
         self.frame_counter = 0
         self.processing_frame = False
         self.last_detection_time = 0
-        self.detection_interval = 0.05
+        self.detection_interval = 1
         self.next_track_id = 0
         self.last_detections = []
         self.last_tracks = []
@@ -390,7 +391,6 @@ class MonitoringTab(QWidget):
 
         if source_type == 'camera':
             source_path = "camera"
-            source_path = self.camera_combo.currentData()
             self.single_video_thread = VideoThread(source_type, source_path)
             self.single_video_thread.frame_ready.connect(self.on_frame_received)
             self.single_video_thread.status_update.connect(self.status_label.setText)
@@ -521,7 +521,6 @@ class MonitoringTab(QWidget):
 
     def on_detection_done(self, detections, frame, frame_counter, results, source_id):
         try:
-            print(detections)
             violations = []
             tracks = self.simple_tracking(detections)
 
@@ -539,10 +538,9 @@ class MonitoringTab(QWidget):
                     violations.append({
                         'timestamp': datetime.now().strftime("%H:%M:%S"),
                         'class': violation['violation_type'],
-                        'confidence': f"{violation['confidence']:.3f}",
+                        'confidence': violation['confidence'],
                         'human_id': human_id,
                     })
-
                     self.violation_logger.add_frame_violations(
                         frame_counter,
                         {human_id: [violation]},
@@ -559,7 +557,7 @@ class MonitoringTab(QWidget):
             self.processing_frame = False
 
     def on_camera_frame(self, camera_index, frame, source_id):
-        print(f"on_camera_frame: camera_index={camera_index}, source_id={source_id}")
+
         self.camera_original_frames[camera_index] = frame
 
 
@@ -579,7 +577,6 @@ class MonitoringTab(QWidget):
                 detection_thread = DetectionThread(
                     self.model, frame, self.conf_slider.value() / 100.0, self.frame_counter
                 , source_id=source_id)
-                print(source_id)
                 detection_thread.detection_done.connect(
                     lambda det, frm, cnt, res, src_id, idx=camera_index: self.on_camera_detection_done(idx, det, frm,
                                                                                                        cnt, res,src_id)
@@ -595,11 +592,10 @@ class MonitoringTab(QWidget):
 
     def on_camera_detection_done(self, camera_index, detections, frame, frame_counter, results, source_id=None):
         if camera_index not in self.camera_detection_in_progress:
-            print(f"Warning: camera_index {camera_index} not in detection_in_progress")
+
             return
 
         try:
-            print(f"Camera {camera_index} detection done, source_id: {source_id}, detections: {len(detections)}")
             display_frame = frame.copy()
             print(camera_index)
             self.draw_detections_on_frame_simple(display_frame, detections)

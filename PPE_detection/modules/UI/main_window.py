@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import QApplication
 
 from modules.UI.violation_log_window import ViolationLogsTab
 from modules.config import APP_ICON_PATH
-from modules.logger import ViolationLogger
+from modules.database.sqlite_logger import SQLiteLogger
 from modules.monitoring_window import MonitoringTab
 
 
@@ -32,7 +32,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabsClosable(False)
         self.tab_widget.tabBar().setMinimumWidth(400)
         log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "logs"))
-        self.logger = ViolationLogger(output_dir=log_dir)
+        self.logger = SQLiteLogger('../../logs/violations.db')
 
         main_log_path = os.path.join(log_dir, "main_log.csv")
 
@@ -156,7 +156,6 @@ class MainWindow(QMainWindow):
     def _safe_exit(self):
         try:
             self.logger.flush()
-            self.logger.merge_session_logs(master_file="../logs/main_log.csv")
         except Exception as e:
             print(f"Error during final merge: {e}")
 

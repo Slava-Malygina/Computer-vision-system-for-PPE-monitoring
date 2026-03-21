@@ -39,7 +39,7 @@ class ViolationLogsTab(QWidget):
         self.refresh_btn = None
         self.per_page_combo = None
         self.filter_panel = None
-        self.logger = SQLiteLogger(db_path='../../logs/violations.db',)
+        self.logger = logger
         self._session_merged = False
 
         self.data_loaded = False
