@@ -29,6 +29,7 @@ class MonitoringTab(QWidget):
         self.current_frame = None
         self.frame_counter = 0
         self.thresholdManager = ThresholdManager()
+        self.threshold_manager = ThresholdManager()
         self.tracking_manager = TrackingManager()
         self.camera_manager = CameraManager()
         self.video_processor = VideoProcessor(logger, self.camera_manager, self.frame_counter)
@@ -740,7 +741,10 @@ class MonitoringTab(QWidget):
             self.multi_camera_widget.setVisible(False)
 
     def _create_detection_thread(self, frame, source_id, camera_index=None):
-        thread = self.video_processor.create_detection_thread(frame, source_id, camera_index)
+        thresholds = self.threshold_manager.get_thresholds(source_id)
+        thread = self.video_processor.create_detection_thread(
+            frame, source_id, camera_index, thresholds
+        )
         if camera_index is not None:
             thread.detection_done.connect(
                 lambda det, frm, cnt, res, src_id, idx=camera_index:
@@ -748,7 +752,6 @@ class MonitoringTab(QWidget):
             )
         else:
             thread.detection_done.connect(self.on_detection_done)
-
         return thread
 
     def _clear_camera_state(self):
