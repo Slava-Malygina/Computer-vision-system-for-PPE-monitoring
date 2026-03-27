@@ -85,6 +85,7 @@ class DetectionThresholdsDialog(QDialog):
         layout.addWidget(group)
 
         btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btn_box.button(QDialogButtonBox.Cancel).setText("Отмена")
         btn_box.accepted.connect(self.accept)
         btn_box.rejected.connect(self.reject)
         layout.addWidget(btn_box)
