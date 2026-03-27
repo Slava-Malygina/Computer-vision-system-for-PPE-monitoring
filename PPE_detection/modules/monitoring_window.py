@@ -57,6 +57,8 @@ class MonitoringTab(QWidget):
         self.camera_last_frame = {}
         self.camera_last_displayed_frame = {}
         self.camera_last_detection_time = {}
+        self.camera_tracking_managers = {}
+        self.camera_last_detections = {}
 
         self.camera_original_frames = {}
         self.camera_displayed_frames = {}
@@ -535,11 +537,15 @@ class MonitoringTab(QWidget):
             self.processing_frame = False
 
     def on_camera_frame(self, camera_index, frame, source_id):
-
         self.camera_original_frames[camera_index] = frame
 
-        if camera_index not in self.camera_displayed_frames:
-            self.ui_handler.update_frame(camera_index, frame)
+        last_detections = self.camera_last_detections.get(camera_index)
+        if last_detections is not None:
+            display_frame = frame.copy()
+            draw_detections_on_frame(display_frame, last_detections)
+        else:
+            display_frame = frame
+        self.ui_handler.update_frame(camera_index, display_frame)
 
         if self.video_processor.is_detecting and self.video_processor.model is not None:
             if self.camera_detection_in_progress.get(camera_index, False):
@@ -551,9 +557,13 @@ class MonitoringTab(QWidget):
                 self.camera_last_detection_time[camera_index] = current_time
                 self.camera_detection_in_progress[camera_index] = True
                 detection_thread = self._create_detection_thread(frame, source_id, camera_index)
-                detection_thread.finished.connect(lambda: self._remove_detection_thread(detection_thread))
+                detection_thread.finished.connect(
+                    lambda idx=camera_index: self._on_detection_thread_finished(idx))
                 self.detection_threads.append(detection_thread)
                 detection_thread.start()
+
+    def _on_detection_thread_finished(self, camera_index):
+        self.camera_detection_in_progress[camera_index] = False
 
     def _remove_detection_thread(self, thread):
         if thread in self.detection_threads:
@@ -561,16 +571,39 @@ class MonitoringTab(QWidget):
 
     def on_camera_detection_done(self, camera_index, detections, frame, frame_counter, results, source_id=None):
         if camera_index not in self.camera_detection_in_progress:
-
             return
 
         try:
+            self.camera_last_detections[camera_index] = detections
+
             display_frame = frame.copy()
-            print(camera_index)
             draw_detections_on_frame(display_frame, detections)
-            self.camera_displayed_frames[camera_index] = display_frame
             self.ui_handler.update_frame(camera_index, display_frame)
 
+            tracker = self.camera_tracking_managers.get(camera_index)
+            if tracker is None:
+                from utils.tracking_utils import TrackingManager
+                tracker = TrackingManager()
+                self.camera_tracking_managers[camera_index] = tracker
+            tracks = tracker.update(detections)
+
+            result = self.violation_detector.process_frame(detections, tracks, frame_counter)
+
+            for human_id, human_violations in result['violations_dict'].items():
+                for violation in human_violations:
+                    self.ui_handler.add_violation({
+                        'timestamp': datetime.now().strftime("%H:%M:%S"),
+                        'class': violation['violation_type'],
+                        'confidence': violation['confidence'],
+                        'human_id': human_id,
+                        'camera_id': source_id or f"cam_{camera_index}"
+                    })
+                    self.violation_logger.add_frame_violations(
+                        frame_counter,
+                        {human_id: [violation]},
+                        source_id or f"cam_{camera_index}",
+                        result["screenshot_path"]
+                    )
         except Exception as e:
             print(f"Multi-camera detection error for camera {camera_index}: {e}")
         finally:
@@ -658,6 +691,7 @@ class MonitoringTab(QWidget):
     def _sync_cameras_with_addresses(self, new_addresses: list):
         self.camera_manager.stop_all()
         self._clear_camera_state()
+
         for manager_idx in self.camera_index_map.values():
             try:
                 self.camera_manager.get_frame_ready_signal(manager_idx).disconnect()
@@ -668,17 +702,27 @@ class MonitoringTab(QWidget):
             except:
                 pass
             self.camera_manager.remove_camera(manager_idx)
+
         active_addresses = [addr for addr in new_addresses if addr]
         self.camera_index_map.clear()
 
+        test_videos = ["test1.mp4", "test2.mp4", "test3.mp4", "test4.mp4"]
+
         for ui_idx, addr in enumerate(active_addresses):
-            manager_idx = self.camera_manager.add_camera("rtsp", addr)
+            if ui_idx < len(test_videos):
+                manager_idx = self.camera_manager.add_camera("video", test_videos[ui_idx])
+            else:
+                manager_idx = self.camera_manager.add_camera("rtsp", addr)
+
             self.camera_index_map[ui_idx] = manager_idx
             print(f"Synced: ui_idx={ui_idx}, manager_idx={manager_idx}, addr={addr}")
+
             self.camera_manager.get_frame_ready_signal(manager_idx).connect(
-                lambda frame, source_path, idx=ui_idx: self.on_camera_frame(idx, frame, source_path))
+                lambda frame, source_path, idx=ui_idx: self.on_camera_frame(idx, frame, source_path)
+            )
             self.camera_manager.get_status_signal(manager_idx).connect(
-                lambda status, idx=ui_idx: self.on_camera_status(idx, status))
+                lambda status, idx=ui_idx: self.on_camera_status(idx, status)
+            )
 
             fps_signal = self.camera_manager.get_fps_signal(manager_idx)
             if fps_signal:
@@ -715,9 +759,10 @@ class MonitoringTab(QWidget):
         self.camera_last_frame.clear()
         self.camera_last_displayed_frame.clear()
         self.camera_last_detections.clear()
+        self.camera_last_detections.clear()
+        self.camera_tracking_managers.clear()
 
     def _start_single_video(self, source_type, source_path):
-        """Запуск одиночного видео (камера или файл)"""
         self.single_video_thread = VideoThread(source_type, source_path)
         self.single_video_thread.frame_ready.connect(self.on_frame_received)
         self.single_video_thread.status_update.connect(self.ui_handler.update_status)
