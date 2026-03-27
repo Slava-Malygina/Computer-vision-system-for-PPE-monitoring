@@ -183,7 +183,7 @@ class MonitoringTab(QWidget):
         self.rtsp_input.textChanged.connect(self.on_rtsp_text_changed)
         source_layout.addWidget(self.rtsp_input)
 
-        self.add_rtsp_btn = QPushButton("Добавить...")
+        self.add_rtsp_btn = QPushButton("Настройки")
         self.add_rtsp_btn.setVisible(False)
         self.add_rtsp_btn.clicked.connect(self._open_rtsp_config)
         source_layout.addWidget(self.add_rtsp_btn)
@@ -645,11 +645,12 @@ class MonitoringTab(QWidget):
             return False
 
     def _open_rtsp_config(self):
+
         result = RtspConfigDialog.open_and_get(
             self,
             existing=self.rtsp_addresses,
+            validator=None
         )
-
         if result is not None:
             self._sync_cameras_with_addresses(result)
         self.rtsp_input.setFocus()

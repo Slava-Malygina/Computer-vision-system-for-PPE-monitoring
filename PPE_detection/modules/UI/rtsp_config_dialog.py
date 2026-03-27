@@ -1,10 +1,24 @@
+import os
+
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QLabel,
     QLineEdit, QDialogButtonBox,
-    QGroupBox, QGridLayout, QToolButton
+    QGroupBox, QGridLayout, QToolButton, QMessageBox
 )
 
+from modules.UI.detection_threshold_dialog import DetectionThresholdsDialog
+from modules.utils.threshold_manager import ThresholdManager
 
+DEFAULT_THRESHOLDS = {
+    'head': 0.6,
+    'helmet': 0.5,
+    'body': 0.6,
+    'vest': 0.5,
+    'palm': 0.4,
+    'glove': 0.3,
+    'person': 0.7
+}
 class RtspConfigDialog(QDialog):
     MAX_SOURCES = 4
 
@@ -13,11 +27,11 @@ class RtspConfigDialog(QDialog):
         self.setWindowTitle("Настройка IP-камер")
         self.setModal(True)
         self.resize(520, 280)
-
+        self.settings_buttons = []
         self.rtsp_inputs = []
         self.remove_buttons = []
         self.validator_callback = validator_callback
-
+        self.threshold_manager = ThresholdManager()
         self._init_ui(existing_addresses or [""] * self.MAX_SOURCES)
 
     def _init_ui(self, existing_addresses):
@@ -34,6 +48,24 @@ class RtspConfigDialog(QDialog):
         for i in range(self.MAX_SOURCES):
             label = QLabel(f"Камера {i + 1}:")
             label.setMinimumWidth(70)
+            base_path = os.path.dirname(os.path.abspath(__file__))
+            icon_path = os.path.normpath(os.path.join(base_path, "..", "icons", "ic_settings.png"))
+            settings_btn = QToolButton()
+            settings_btn.setIcon(QIcon(icon_path))
+            settings_btn.setFixedSize(26, 26)
+            settings_btn.setToolTip("Настройки камеры")
+            settings_btn.setStyleSheet("""
+                    QToolButton {
+                        background-color: #3498db;
+                        color: white;
+                        border: none;
+                        border-radius: 3px;
+                        font-weight: bold;
+                    }
+                    QToolButton:hover { background-color: #2980b9; }
+                """)
+            settings_btn.clicked.connect(lambda _, idx=i: self._on_settings_clicked(idx))
+
 
             line_edit = QLineEdit()
             line_edit.setPlaceholderText("rtsp://")
@@ -62,9 +94,12 @@ class RtspConfigDialog(QDialog):
 
             self.rtsp_inputs.append(line_edit)
             self.remove_buttons.append(remove_btn)
+            self.settings_buttons.append(settings_btn)
+
             grid.addWidget(label, i, 0)
-            grid.addWidget(remove_btn, i, 2)
             grid.addWidget(line_edit, i, 1)
+            grid.addWidget(remove_btn, i, 2)
+            grid.addWidget(settings_btn, i, 3)
 
         main_layout.addWidget(group)
         btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -98,3 +133,30 @@ class RtspConfigDialog(QDialog):
     def _remove_address(self, index):
         self.rtsp_inputs[index].clear()
         self._on_text_changed(index)
+
+    def _on_settings_clicked(self, index):
+        current_address = self.rtsp_inputs[index].text().strip()
+        if not current_address:
+            QMessageBox.warning(self, "Предупреждение",
+                                f"Сначала введите RTSP адрес для камеры {index + 1}")
+            return
+
+        if self.threshold_manager:
+            current_thresholds = self.threshold_manager.get_thresholds(current_address)
+        else:
+            current_thresholds = DEFAULT_THRESHOLDS.copy()
+
+        dialog = DetectionThresholdsDialog(
+            camera_index=index,
+            current_thresholds=current_thresholds,
+            camera_source=current_address,
+            parent=self
+        )
+
+        if dialog.exec_() == QDialog.Accepted:
+            new_thresholds = dialog.get_thresholds()
+
+            for key, value in new_thresholds.items():
+                print(f"  - {key}: {value}")
+            if self.threshold_manager:
+                self.threshold_manager.set_thresholds(current_address, new_thresholds)
