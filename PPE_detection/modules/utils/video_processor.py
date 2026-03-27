@@ -39,30 +39,25 @@ class VideoProcessor(QObject):
         self.last_violations = {}
 
     def set_conf_threshold(self, value):
-        """Установка порога уверенности"""
         self.conf_threshold = value
 
-    def create_detection_thread(self, frame, source_id, camera_index=None):
-        """Создание потока детекции"""
-        from modules.detection_thread import DetectionThread
-        if self.model is None:
-            print("Ошибка: модель не загружена")
-            return None
+    def create_detection_thread(self, frame, source_id, camera_index=None, class_thresholds=None):
+        from detection_thread import DetectionThread
         thread = DetectionThread(
             self.model,
             frame,
             self.conf_threshold,
             self.frame_counter,
-            source_id
+            source_id,
+            class_thresholds
         )
         return thread
 
     def increment_frame_counter(self):
-        """Увеличить счетчик кадров"""
         self.frame_counter += 1
 
     def load_model(self):
-        from modules.model_loader import ModelLoader
+        from model_loader import ModelLoader
 
         try:
             loader = ModelLoader()
