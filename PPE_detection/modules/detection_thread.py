@@ -6,13 +6,14 @@ import numpy as np
 class DetectionThread(QThread):
     detection_done = pyqtSignal(object, object, object, object, str)
 
-    def __init__(self, model, frame, conf_threshold, frame_counter, source_id):
+    def __init__(self, model, frame, conf_threshold, frame_counter, source_id, class_thresholds=None):
         super().__init__()
         self.model = model
         self.frame = frame
         self.conf_threshold = conf_threshold
         self.frame_counter = frame_counter
         self.source_id = source_id
+        self.class_thresholds = class_thresholds
 
     def run(self):
         try:
@@ -28,10 +29,18 @@ class DetectionThread(QThread):
                     conf = float(box.conf[0])
                     class_name = self.model.names[cls]
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    
+                
                     box_area = (x2 - x1) * (y2 - y1)
                     min_area = 50
-                    
+                
+                    if self.class_thresholds is not None:
+                        required_conf = self.class_thresholds.get(class_name, 0.0)
+                        if conf < required_conf:
+                            continue
+                    else:
+                        if conf < self.conf_threshold:
+                            continue
+
                     if box_area >= min_area:
                         detections.append({
                             'cls': class_name,
@@ -40,30 +49,43 @@ class DetectionThread(QThread):
                             'area': box_area
                         })
 
+            if self.class_thresholds:
+                print(f"[{self.source_id}] Применяю пороги: {self.class_thresholds}")
+                for det in detections:
+                    print(f"  - {det['cls']} conf={det['conf']:.2f} req={self.class_thresholds.get(det['cls'], 0):.2f}")
+
             if len(detections) < 3:
                 enlarged_frame = self.enhance_small_objects(self.frame)
                 enhanced_results = self.model(enlarged_frame,
                                             conf=max(0.15, self.conf_threshold * 0.7),
                                             verbose=False,
                                             imgsz=640)
-                
+            
                 if len(enhanced_results) > 0 and enhanced_results[0].boxes is not None:
                     for box in enhanced_results[0].boxes:
                         cls = int(box.cls[0])
                         conf = float(box.conf[0])
                         class_name = self.model.names[cls]
                         x1, y1, x2, y2 = map(int, box.xyxy[0])
-                        
+                    
                         scale_x = self.frame.shape[1] / enlarged_frame.shape[1]
                         scale_y = self.frame.shape[0] / enlarged_frame.shape[0]
-                        
+                    
                         x1 = int(x1 * scale_x)
                         y1 = int(y1 * scale_y)
                         x2 = int(x2 * scale_x)
                         y2 = int(y2 * scale_y)
-                        
+                    
                         box_area = (x2 - x1) * (y2 - y1)
-                        
+                    
+                        if self.class_thresholds is not None:
+                            required_conf = self.class_thresholds.get(class_name, 0.0)
+                            if conf < required_conf:
+                                continue
+                        else:
+                            if conf < max(0.15, self.conf_threshold * 0.7):
+                                continue
+
                         is_duplicate = False
                         for existing_det in detections:
                             existing_bbox = existing_det['bbox']
@@ -71,7 +93,7 @@ class DetectionThread(QThread):
                             if iou > 0.3:
                                 is_duplicate = True
                                 break
-                        
+                    
                         if not is_duplicate and box_area >= 25:
                             detections.append({
                                 'cls': class_name,
