@@ -133,5 +133,4 @@ class DetectionThread(QThread):
         return inter_area / union_area if union_area > 0 else 0
 
     def update_thresholds(self, new_thresholds: dict):
-        print("rtty")
         self.class_thresholds = new_thresholds

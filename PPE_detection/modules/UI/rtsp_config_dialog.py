@@ -1,5 +1,6 @@
 import os
 
+from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QLabel,
@@ -21,7 +22,7 @@ DEFAULT_THRESHOLDS = {
 }
 class RtspConfigDialog(QDialog):
     MAX_SOURCES = 4
-
+    SESSION_SAVED = QDialog.DialogCode(2)
     def __init__(self, parent=None, existing_addresses=None, validator_callback=None):
         super().__init__(parent)
         self.setWindowTitle("Настройка IP-камер")
@@ -33,6 +34,7 @@ class RtspConfigDialog(QDialog):
         self.validator_callback = validator_callback
         self.threshold_manager = ThresholdManager()
         self.session_thresholds = {}
+        self.session_addresses = None
         self._init_ui(existing_addresses or [""] * self.MAX_SOURCES)
 
     def _init_ui(self, existing_addresses):
@@ -151,13 +153,17 @@ class RtspConfigDialog(QDialog):
     @staticmethod
     def open_and_get(parent, existing=None, validator=None):
         dialog = RtspConfigDialog(parent, existing, validator)
-        if dialog.exec_() == QDialog.Accepted:
+        result = dialog.exec_()
+        if result == QDialog.Accepted:
             addresses = dialog.get_addresses()
             for address in addresses:
                 if address and not dialog.threshold_manager.threshold_exists(address):
                     dialog.threshold_manager.set_thresholds(address, DEFAULT_THRESHOLDS)
             return addresses
+        elif result == RtspConfigDialog.SESSION_SAVED:
+            return dialog.session_addresses
         return None
+
 
     def _remove_address(self, index):
         self.rtsp_inputs[index].clear()
@@ -190,6 +196,11 @@ class RtspConfigDialog(QDialog):
             if self.threshold_manager:
                 self.threshold_manager.set_thresholds(current_address, new_thresholds)
 
+
     def _save_session_settings(self):
         addresses = [edit.text().strip() for edit in self.rtsp_inputs if edit.text().strip()]
+        self.session_addresses = addresses
+        self.done(self.SESSION_SAVED)
 
+    def get_session_addresses(self):
+        return self.session_addresses

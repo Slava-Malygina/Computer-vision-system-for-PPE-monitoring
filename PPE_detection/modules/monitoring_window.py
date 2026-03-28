@@ -543,9 +543,10 @@ class MonitoringTab(QWidget):
         self.camera_original_frames[camera_index] = frame
 
         last_detections = self.camera_last_detections.get(camera_index)
+        last_tracks = self.camera_last_tracks.get(camera_index)
         if last_detections is not None:
             display_frame = frame.copy()
-            draw_detections_on_frame(display_frame, last_detections)
+            display_frame = draw_detections_on_frame_with_tracking(display_frame, last_detections, last_tracks, {})
         else:
             display_frame = frame
         self.ui_handler.update_frame(camera_index, display_frame)
@@ -575,10 +576,8 @@ class MonitoringTab(QWidget):
     def on_camera_detection_done(self, camera_index, detections, frame, frame_counter, results, source_id=None):
         if camera_index not in self.camera_detection_in_progress:
             return
-
         try:
             self.camera_last_detections[camera_index] = detections
-
             display_frame = frame.copy()
             draw_detections_on_frame(display_frame, detections)
             self.ui_handler.update_frame(camera_index, display_frame)
@@ -589,9 +588,10 @@ class MonitoringTab(QWidget):
                 tracker = TrackingManager()
                 self.camera_tracking_managers[camera_index] = tracker
             tracks = tracker.update(detections)
-
+            self.camera_last_tracks[camera_index] = tracks
             result = self.violation_detector.process_frame(detections, tracks, frame_counter)
-
+            display_frame = draw_detections_on_frame_with_tracking(display_frame, detections, tracks, result)
+            self.ui_handler.update_frame(camera_index, display_frame)
             for human_id, human_violations in result['violations_dict'].items():
                 for violation in human_violations:
                     self.ui_handler.add_violation({
@@ -681,15 +681,16 @@ class MonitoringTab(QWidget):
             return False
 
     def _open_rtsp_config(self):
-
         result = RtspConfigDialog.open_and_get(
             self,
             existing=self.rtsp_addresses,
             validator=None
         )
+
         if result is not None:
             self._sync_cameras_with_addresses(result)
         self.rtsp_input.setFocus()
+
 
     def _sync_cameras_with_addresses(self, new_addresses: list):
         self.camera_manager.stop_all()
@@ -786,14 +787,7 @@ class MonitoringTab(QWidget):
         if self.detection_thread and self.detection_thread.isRunning():
             self.detection_thread.wait(1000)
 
-
     def on_thresholds_updated(self, rtsp_url: str, new_thresholds: dict):
-        """Обработчик обновления порогов - обновляет пороги в активных потоках"""
-        print(f"[MonitoringTab] Получен сигнал об обновлении порогов для {rtsp_url}")
-        print(f"[MonitoringTab] Новые пороги: {new_thresholds}")
-
-
         for thread in self.detection_threads:
             if hasattr(thread, 'source_id') and thread.source_id == rtsp_url:
                 thread.update_thresholds(new_thresholds)
-                print(f"[MonitoringTab] Обновлены пороги в потоке {rtsp_url}")
