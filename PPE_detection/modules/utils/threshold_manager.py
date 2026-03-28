@@ -22,6 +22,7 @@ class ThresholdManager(QObject):
         self._thresholds_by_rtsp: Dict[str, Dict[str, float]] = {}
         self.load_config()
 
+
     def load_config(self):
         """Загружает пороги из YAML-файла"""
         if not os.path.exists(self.config_path):
@@ -64,3 +65,6 @@ class ThresholdManager(QObject):
     def get_all_rtsp_urls(self) -> List[str]:
         """Возвращает список всех RTSP-адресов из конфигурации"""
         return list(self._thresholds_by_rtsp.keys())
+
+    def threshold_exists(self, rtsp_url: str) -> bool:
+        return rtsp_url in self._thresholds_by_rtsp

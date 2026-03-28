@@ -4,7 +4,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QLabel,
     QLineEdit, QDialogButtonBox,
-    QGroupBox, QGridLayout, QToolButton, QMessageBox
+    QGroupBox, QGridLayout, QToolButton, QMessageBox, QHBoxLayout, QPushButton
 )
 
 from modules.UI.detection_threshold_dialog import DetectionThresholdsDialog
@@ -32,6 +32,7 @@ class RtspConfigDialog(QDialog):
         self.remove_buttons = []
         self.validator_callback = validator_callback
         self.threshold_manager = ThresholdManager()
+        self.session_thresholds = {}
         self._init_ui(existing_addresses or [""] * self.MAX_SOURCES)
 
     def _init_ui(self, existing_addresses):
@@ -102,10 +103,34 @@ class RtspConfigDialog(QDialog):
             grid.addWidget(settings_btn, i, 3)
 
         main_layout.addWidget(group)
+
+        btn_layout = QHBoxLayout()
+        session_save_btn = QPushButton("Сохранить для сессии")
+        session_save_btn.setToolTip("Сохранить настройки только для текущей сессии")
+        session_save_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f39c12;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #e67e22;
+            }
+        """)
+        session_save_btn.clicked.connect(self._save_session_settings)
+
         btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btn_box.button(QDialogButtonBox.Cancel).setText("Отмена")
         btn_box.accepted.connect(self.accept)
         btn_box.rejected.connect(self.reject)
-        main_layout.addWidget(btn_box)
+        btn_layout.addWidget(session_save_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(btn_box)
+
+        main_layout.addLayout(btn_layout)
 
     def _on_text_changed(self, index):
         """Визуальная валидация при вводе."""
@@ -127,7 +152,11 @@ class RtspConfigDialog(QDialog):
     def open_and_get(parent, existing=None, validator=None):
         dialog = RtspConfigDialog(parent, existing, validator)
         if dialog.exec_() == QDialog.Accepted:
-            return dialog.get_addresses()
+            addresses = dialog.get_addresses()
+            for address in addresses:
+                if address and not dialog.threshold_manager.threshold_exists(address):
+                    dialog.threshold_manager.set_thresholds(address, DEFAULT_THRESHOLDS)
+            return addresses
         return None
 
     def _remove_address(self, index):
@@ -160,3 +189,7 @@ class RtspConfigDialog(QDialog):
                 print(f"  - {key}: {value}")
             if self.threshold_manager:
                 self.threshold_manager.set_thresholds(current_address, new_thresholds)
+
+    def _save_session_settings(self):
+        addresses = [edit.text().strip() for edit in self.rtsp_inputs if edit.text().strip()]
+
