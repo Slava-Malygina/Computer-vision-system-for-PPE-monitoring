@@ -243,7 +243,6 @@ class ViolationLogsTab(QWidget):
                 sort_by=sort_by,
                 sort_order=sort_order
             )
-            print(data)
 
             self.total_records = self.logger.get_violations_count(
                 camera_id=camera_id,

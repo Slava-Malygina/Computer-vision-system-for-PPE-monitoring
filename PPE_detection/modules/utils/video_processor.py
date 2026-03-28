@@ -1,6 +1,7 @@
 import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal
 
+from modules.detection_thread import DetectionThread
 from modules.violation_detector import ViolationDetector
 
 
@@ -42,7 +43,7 @@ class VideoProcessor(QObject):
         self.conf_threshold = value
 
     def create_detection_thread(self, frame, source_id, camera_index=None, class_thresholds=None):
-        from detection_thread import DetectionThread
+
         thread = DetectionThread(
             self.model,
             frame,
@@ -57,7 +58,7 @@ class VideoProcessor(QObject):
         self.frame_counter += 1
 
     def load_model(self):
-        from model_loader import ModelLoader
+        from modules.model_loader import ModelLoader
 
         try:
             loader = ModelLoader()

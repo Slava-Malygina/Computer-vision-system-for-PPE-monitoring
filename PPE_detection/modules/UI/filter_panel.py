@@ -85,7 +85,7 @@ class FilterPanel(QWidget):
         sort_group.setLayout(sort_layout)
 
         self.sort_field = QComboBox()
-        self.sort_field.addItems(["Дата", "Время", "ID нарушителя", "Тип нарушения", "Вероятность"])
+        self.sort_field.addItems(["Дата", "Время", "Вероятность"])
         self.sort_order = QComboBox()
         self.sort_order.addItems(["По возрастанию", "По убыванию"])
         sort_layout.addWidget(self.sort_field)

@@ -1,23 +1,23 @@
 cameras:
-- rtsp_url: test1.mp4
+- rtsp_url: rtsp://localhost:8554/stream1
   detection_thresholds:
-    head: 0.3
-    helmet: 0.63
-    body: 0.82
+    head: 0.36
+    helmet: 0.57
+    body: 0.72
     vest: 0.43
-    palm: 0.58
+    palm: 0.56
     glove: 0.34
-    person: 0.65
-- rtsp_url: test2.mp4
+    person: 0.42
+- rtsp_url: rtsp://localhost:8554/stream2
   detection_thresholds:
     head: 0.4
     helmet: 0.3
     body: 0.35
     vest: 0.3
-    palm: 0.3
+    palm: 0.2
     glove: 0.2
-    person: 0.75
-- rtsp_url: test3.mp4
+    person: 0.4
+- rtsp_url: rtsp://localhost:8554/stream3
   detection_thresholds:
     head: 0.45
     helmet: 0.5
@@ -26,7 +26,7 @@ cameras:
     palm: 0.4
     glove: 0.3
     person: 0.7
-- rtsp_url: test4.mp4
+- rtsp_url: rtsp://localhost:8554/stream4
   detection_thresholds:
     head: 0.4
     helmet: 0.3
@@ -34,4 +34,6 @@ cameras:
     vest: 0.3
     palm: 0.3
     glove: 0.2
-    person: 0.7
+    person: 0.61
+
+

@@ -82,6 +82,8 @@ class MonitoringTab(QWidget):
         )
         self.set_addr_auto()
 
+        self.threshold_manager.thresholds_updated.connect(self.on_thresholds_updated)
+
     def init_ui(self):
         self.setStyleSheet("""
             QMainWindow {
@@ -583,7 +585,7 @@ class MonitoringTab(QWidget):
 
             tracker = self.camera_tracking_managers.get(camera_index)
             if tracker is None:
-                from utils.tracking_utils import TrackingManager
+                from modules.utils.tracking_utils import TrackingManager
                 tracker = TrackingManager()
                 self.camera_tracking_managers[camera_index] = tracker
             tracks = tracker.update(detections)
@@ -710,10 +712,7 @@ class MonitoringTab(QWidget):
         test_videos = ["test1.mp4", "test2.mp4", "test3.mp4", "test4.mp4"]
 
         for ui_idx, addr in enumerate(active_addresses):
-            if ui_idx < len(test_videos):
-                manager_idx = self.camera_manager.add_camera("video", test_videos[ui_idx])
-            else:
-                manager_idx = self.camera_manager.add_camera("rtsp", addr)
+            manager_idx = self.camera_manager.add_camera("rtsp", addr)
 
             self.camera_index_map[ui_idx] = manager_idx
             print(f"Synced: ui_idx={ui_idx}, manager_idx={manager_idx}, addr={addr}")
@@ -786,3 +785,15 @@ class MonitoringTab(QWidget):
 
         if self.detection_thread and self.detection_thread.isRunning():
             self.detection_thread.wait(1000)
+
+
+    def on_thresholds_updated(self, rtsp_url: str, new_thresholds: dict):
+        """Обработчик обновления порогов - обновляет пороги в активных потоках"""
+        print(f"[MonitoringTab] Получен сигнал об обновлении порогов для {rtsp_url}")
+        print(f"[MonitoringTab] Новые пороги: {new_thresholds}")
+
+
+        for thread in self.detection_threads:
+            if hasattr(thread, 'source_id') and thread.source_id == rtsp_url:
+                thread.update_thresholds(new_thresholds)
+                print(f"[MonitoringTab] Обновлены пороги в потоке {rtsp_url}")

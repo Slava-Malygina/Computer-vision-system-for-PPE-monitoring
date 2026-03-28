@@ -29,6 +29,7 @@ class VideoThread(QThread):
         self.last_fps_time = time.time()
 
         try:
+            print(self.source_type)
             if self.source_type == 'rtsp':
                 self.status_update.emit("RTSP: подключение...")
                 if not self.open_rtsp():

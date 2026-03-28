@@ -1,6 +1,7 @@
 import os
 import yaml
 from typing import Dict, List
+from PyQt5.QtCore import QObject, pyqtSignal
 
 DEFAULT_THRESHOLDS = {
     'head': 0.6,
@@ -13,8 +14,10 @@ DEFAULT_THRESHOLDS = {
 }
 
 
-class ThresholdManager:
+class ThresholdManager(QObject):
+    thresholds_updated = pyqtSignal(str, dict)
     def __init__(self, config_path: str = "..\..\config\config.yaml"):
+        super().__init__()
         self.config_path = config_path
         self._thresholds_by_rtsp: Dict[str, Dict[str, float]] = {}
         self.load_config()
@@ -42,6 +45,7 @@ class ThresholdManager:
         """Обновляет пороги для камеры и сохраняет в файл"""
         self._thresholds_by_rtsp[rtsp_url] = new_thresholds
         self.save_config()
+        self.thresholds_updated.emit(rtsp_url, new_thresholds)
 
     def save_config(self):
         """Сохраняет текущие пороги в config.yaml"""

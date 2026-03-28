@@ -217,8 +217,6 @@ class SQLiteLogger:
             "date": "date",
             "time": "time",
             "confidence": "confidence",
-            "camera": "camera_id",
-            "type": "violation_type"
         }
 
         sort_column = allowed_sort_fields.get(sort_by, "date")
