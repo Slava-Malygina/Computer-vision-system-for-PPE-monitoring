@@ -66,12 +66,12 @@ class MultiCameraWidget(QWidget):
             container_layout.setSpacing(1)
             video_label = QLabel()
             video_label.setAlignment(Qt.AlignCenter)
-            video_label.setStyleSheet("background-color: #1a1f25; border: 1px solid #2a2e35;")
+            video_label.setStyleSheet("background-color: #323055; border: 1px solid #2a2e35;")
             video_label.setText(f"Камера {i + 1}")
             container_layout.addWidget(video_label)
             self._labels.append(video_label)
             info_label = QLabel("")
-            info_label.setStyleSheet("color: #8a94a6; font-size: 9px; background-color: #1a1f25; padding: 2px;")
+            info_label.setStyleSheet("color: #8a94a6; font-size: 9px; background-color: #323055; padding: 2px;")
             info_label.setFixedHeight(20)
 
             row = i // cols

@@ -10,22 +10,31 @@ from PyQt5.QtWidgets import QSlider
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QComboBox
 
+from modules.utils.style_loader import StyleLoader
+
 
 class FilterPanel(QWidget):
     downloadRequested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-
+        combo_box_stylesheet = StyleLoader.load_stylesheet("checkable_combobox_style.qss")
+        self.setStyleSheet(combo_box_stylesheet)
         main_layout = QVBoxLayout(self)
         main_layout.setAlignment(Qt.AlignTop)
-        filter_group = QGroupBox("Фильтровать")
+        filter_group = QWidget()
+        filter_group.setObjectName("setPanel")
         filter_layout = QVBoxLayout()
         filter_layout.setContentsMargins(5, 5, 5, 5)
-
+        filter_layout.setContentsMargins(16, 8, 16, 8)
         filter_group.setLayout(filter_layout)
-        type_layout = QHBoxLayout()
+        filter_label = QLabel("Фильтровать")
+        filter_label.setObjectName("funcLabel")
 
+        main_layout.addWidget(filter_label)
+        main_layout.addSpacing(20)
+
+        type_layout = QHBoxLayout()
         camera_layout = QHBoxLayout()
         camera_label = QLabel("По камере:")
         self.camera_combo = CheckableComboBox()
@@ -51,25 +60,25 @@ class FilterPanel(QWidget):
         filter_layout.addLayout(type_layout)
 
         date_layout = QHBoxLayout()
-        date_layout.addWidget(QLabel("Дата с:"))
+        date_layout.addWidget(QLabel("Дата с:"),  stretch=1)
         self.date_from = QDateEdit(QDate.currentDate().addMonths(-1))
         self.date_from.setCalendarPopup(True)
-        date_layout.addWidget(self.date_from)
+        date_layout.addWidget(self.date_from, stretch=2)
 
-        date_layout.addWidget(QLabel("по:"))
+        date_layout.addWidget(QLabel("по:"), stretch=1)
         self.date_to = QDateEdit(QDate.currentDate())
         self.date_to.setCalendarPopup(True)
-        date_layout.addWidget(self.date_to)
+        date_layout.addWidget(self.date_to, stretch=2)
         filter_layout.addLayout(date_layout)
 
         time_layout = QHBoxLayout()
-        time_layout.addWidget(QLabel("Время с:"))
+        time_layout.addWidget(QLabel("Время с:"), stretch=1)
         self.time_from = QTimeEdit(QTime(0, 0))
-        time_layout.addWidget(self.time_from)
+        time_layout.addWidget(self.time_from, stretch=2)
 
-        time_layout.addWidget(QLabel("по:"))
+        time_layout.addWidget(QLabel("по:"), stretch=1)
         self.time_to = QTimeEdit(QTime(23, 59))
-        time_layout.addWidget(self.time_to)
+        time_layout.addWidget(self.time_to, stretch=2)
         filter_layout.addLayout(time_layout)
         self.prob_slider = RangeSlider(0, 100)
         prob_layout = QHBoxLayout()
@@ -79,8 +88,14 @@ class FilterPanel(QWidget):
         self.prob_slider.valueChanged.connect(lambda min_val, max_val: print(min_val, max_val))
 
         main_layout.addWidget(filter_group)
-        main_layout.addSpacing(15)
-        sort_group = QGroupBox("Сортировать")
+        sort_label = QLabel("Сортировать")
+        sort_label.setObjectName("funcLabel")
+        main_layout.addSpacing(20)
+        main_layout.addWidget(sort_label)
+
+        main_layout.addSpacing(20)
+        sort_group = QWidget()
+        sort_group.setObjectName("setPanel")
         sort_layout = QHBoxLayout()
         sort_group.setLayout(sort_layout)
 
@@ -91,22 +106,31 @@ class FilterPanel(QWidget):
         sort_layout.addWidget(self.sort_field)
         sort_layout.addWidget(self.sort_order)
         main_layout.addWidget(sort_group)
-        main_layout.addSpacing(15)
+
+        main_layout.addSpacing(20)
+
         btn_layout = QHBoxLayout()
         self.apply_btn = QPushButton("Применить")
         self.reset_btn = QPushButton("Сбросить")
         btn_layout.addWidget(self.apply_btn)
         btn_layout.addWidget(self.reset_btn)
         main_layout.addLayout(btn_layout)
-        main_layout.addSpacing(50)
-        report_group = QGroupBox("Отчетность")
+        main_layout.addSpacing(20)
+
+        report_label = QLabel("Отчетность")
+        report_label.setObjectName("funcLabel")
+        main_layout.addWidget(report_label)
+        main_layout.addSpacing(20)
+        report_group = QWidget()
+
         report_layout = QVBoxLayout()
         report_group.setLayout(report_layout)
-
+        report_group.setObjectName("setPanel")
         report_type_layout = QHBoxLayout()
         self.full_report_radio = QRadioButton("Полный отчет")
         self.filtered_report_radio = QRadioButton("Отфильтрованный отчет")
         self.full_report_radio.setChecked(True)
+
         report_type_layout.addWidget(self.full_report_radio)
         report_type_layout.addWidget(self.filtered_report_radio)
         report_layout.addLayout(report_type_layout)
@@ -131,44 +155,11 @@ class FilterPanel(QWidget):
         btn_layout.addStretch()
         btn_layout.addWidget(self.download_btn)
         btn_layout.addStretch()
-        report_layout.addLayout(btn_layout)
 
         main_layout.addWidget(report_group)
+        main_layout.addLayout(btn_layout)
         self.download_btn.clicked.connect(self.downloadRequested.emit)
-        self.setStyleSheet("""
-            QDateEdit, QTimeEdit, QSpinBox {
-                background-color: #2a2e35;
-                color: #ffffff;
-                border: 1px solid #3a424e;
-                border-radius: 4px;
-                padding: 2px 4px;
-            }
-             QTimeEdit::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 20px;
-                border-left: 1px solid #3a424e;
-                background: transparent; 
-            }
-            QDateEdit::down-arrow, QDateEdit::up-arrow {
-                width: 10px;
-                height: 10px;
-            }
-              QPushButton {
-                        background-color: #3a7fff;  
-                        color: #ffffff;
-                        border: 1px solid #2a68ff;
-                        border-radius: 4px;
-                        padding: 4px 12px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #5a8fff;
-                    }
-                    QPushButton:pressed {
-                        background-color: #2a5fff;
-                    }
-            """)
+
 
     def get_filter_params(self):
         violations = []

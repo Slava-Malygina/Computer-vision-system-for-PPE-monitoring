@@ -3,14 +3,17 @@ import time
 from datetime import datetime
 
 from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtWidgets import QSizePolicy
+from PyQt5.QtWidgets import QSizePolicy, QFrame
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QListWidget, QSlider, QMessageBox, \
     QSplitter, QComboBox, QFileDialog, QProgressBar, QGroupBox, QLineEdit
 
+from modules.UI.AspectRatioLabel import AspectRatioLabel, ResizeWatcher
+from modules.UI.gradient_outline_button import GradientOutlineButton
 from modules.UI.multi_camera_widget import MultiCameraWidget
 from modules.UI.rtsp_config_dialog import RtspConfigDialog
 from modules.UI.video_errors import show_error, show_rtsp_error
 from modules.camera_manager import CameraManager
+from modules.utils.style_loader import StyleLoader
 from modules.utils.threshold_manager import ThresholdManager
 from modules.utils.tracking_utils import TrackingManager, draw_detections_on_frame_with_tracking, \
     draw_detections_on_frame
@@ -21,9 +24,11 @@ from modules.violation_detector import ViolationDetector
 
 
 class MonitoringTab(QWidget):
-    def __init__(self, logger):
+    def __init__(self, logger, main_window):
         super().__init__()
+        self.main_window = main_window
         self.single_video_thread = None
+        self.is_video_running = False
         self.detection_thread = None
         self.detection_threads = []
         self.current_frame = None
@@ -59,7 +64,7 @@ class MonitoringTab(QWidget):
         self.camera_last_displayed_frame = {}
         self.camera_last_detection_time = {}
         self.camera_tracking_managers = {}
-        self.camera_last_detections = {}
+
 
         self.camera_original_frames = {}
         self.camera_displayed_frames = {}
@@ -85,22 +90,8 @@ class MonitoringTab(QWidget):
         self.threshold_manager.thresholds_updated.connect(self.on_thresholds_updated)
 
     def init_ui(self):
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #0f1419;
-                color: #ffffff;
-            }
-            QPushButton {
-                background-color: #2a2e35;
-                color: #ffffff;
-                border: 1px solid #3a424e;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-weight: bold;
-            }
-        """)
-
         monitor_layout = QVBoxLayout(self)
+        monitor_layout.setContentsMargins(0, 20, 0, 0)
         header_widget = QWidget()
         header_layout = QHBoxLayout(header_widget)
         header_layout.setContentsMargins(2, 2, 2, 2)
@@ -109,59 +100,62 @@ class MonitoringTab(QWidget):
         stats_layout = QHBoxLayout(stats_widget)
 
         self.stats_label = QLabel("Нарушения: 0")
-        self.stats_label.setStyleSheet("""
-            QLabel {
-                font-size: 14px;
-                font-weight: bold;
-                padding: 8px 16px;
-                background-color: #2a2e35;
-                border-radius: 4px;
-            }
-        """)
+        self.stats_label.setObjectName("statsLabel")
+
         stats_layout.addWidget(self.stats_label)
         header_layout.addWidget(stats_widget)
 
-        content_splitter = QSplitter(Qt.Horizontal)
+        content_layout = QHBoxLayout()
 
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
 
-        video_group = QGroupBox("Мониторинг")
+        video_group = ResizeWatcher()
+        video_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         video_layout = QVBoxLayout(video_group)
+        video_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.single_video_label = QLabel()
-        self.single_video_label.setAlignment(Qt.AlignCenter)
-        self.single_video_label.setMinimumSize(700, 500)
-        self.single_video_label.setStyleSheet("""
-            QLabel {
-                background-color: #1a1f25;
-                border: 2px solid #2a2e35;
-                border-radius: 6px;
-                color: #8a94a6;
-                font-size: 14px;
-                qproperty-alignment: AlignCenter;
-            }
-        """)
+        self.multi_cam_container = QWidget()
+        self.multi_cam_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        multi_cam_layout = QVBoxLayout(self.multi_cam_container)
+        multi_cam_layout.setContentsMargins(0, 0, 0, 0)
+        multi_cam_layout.setAlignment(Qt.AlignCenter)
+
+
+        self.video_container = QWidget()
+        self.video_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.video_container.setStyleSheet("background-color: transparent;")
+        container_layout = QVBoxLayout(self.video_container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setAlignment(Qt.AlignCenter)
+
+        self.single_video_label = AspectRatioLabel(aspect_ratio=16/9)
         self.single_video_label.setText("Выберите источник видеопотока")
-        video_layout.addWidget(self.single_video_label)
+        container_layout.addWidget(self.single_video_label)
 
+        video_layout.addWidget(self.video_container, stretch=1)
+        self.multi_cam_container.setVisible(False)
         self.multi_camera_widget = MultiCameraWidget()
         self.multi_camera_widget.setVisible(False)
-        video_layout.addWidget(self.multi_camera_widget)
+        multi_cam_layout.addWidget(self.multi_camera_widget)
+        video_layout.addWidget(self.multi_cam_container, stretch=1)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
         video_layout.addWidget(self.progress_bar)
 
-        left_layout.addWidget(video_group)
+        left_layout.addWidget(video_group, stretch=1)
 
-        control_group = QGroupBox("")
+        control_group = QWidget()
         control_layout = QVBoxLayout(control_group)
 
         source_layout = QHBoxLayout()
         source_layout.addWidget(QLabel("Источник:"))
 
         self.source_combo = QComboBox()
+        combo_box_stylesheet = StyleLoader.load_stylesheet("combo_box_general_style.qss")
+        self.source_combo.setStyleSheet(combo_box_stylesheet)
+
         self.source_combo.addItem("Камера", "camera")
         self.source_combo.addItem("Видеофайл", "video")
         self.source_combo.addItem("IP-камера", "rtsp")
@@ -170,6 +164,7 @@ class MonitoringTab(QWidget):
 
         self.camera_combo = QComboBox()
         self.camera_combo.setMinimumWidth(120)
+        self.camera_combo.setStyleSheet(combo_box_stylesheet)
         source_layout.addWidget(self.camera_combo)
 
         self.video_path_label = QLabel("Файл не выбран")
@@ -180,9 +175,11 @@ class MonitoringTab(QWidget):
         self.rtsp_input.setVisible(False)
         self.rtsp_input.setStyleSheet("""
             QLineEdit {
+                background: #323055;
                 border: 1px solid #3a424e;
-                border-radius: 4px;
+                border-radius: 10px;
                 padding: 4px;
+                color: white;
             }
         """)
         self.rtsp_input.textChanged.connect(self.on_rtsp_text_changed)
@@ -201,59 +198,20 @@ class MonitoringTab(QWidget):
         control_layout.addLayout(source_layout)
 
         buttons_layout = QHBoxLayout()
-        self.start_btn = QPushButton("СТАРТ")
-        self.start_btn.setMinimumHeight(40)
-        self.start_btn.clicked.connect(self.start_video)
-        self.start_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #27ae60;
-                color: white;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #2ecc71;
-            }
-        """)
-        buttons_layout.addWidget(self.start_btn)
+        self.video_btn = QPushButton("Запуск видео")
+        self.video_btn.setMinimumHeight(40)
+        self.video_btn.clicked.connect(self.on_video_btn_clicked)
 
-        self.stop_btn = QPushButton("СТОП")
-        self.stop_btn.setMinimumHeight(40)
-        self.stop_btn.clicked.connect(self.stop_video)
-        self.stop_btn.setEnabled(False)
-        self.stop_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #e74c3c;
-                color: white;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #ec7063;
-            }
-        """)
-        buttons_layout.addWidget(self.stop_btn)
+
 
         control_layout.addLayout(buttons_layout)
-        left_layout.addWidget(control_group)
+        left_layout.addWidget(control_group, stretch=0)
 
-        detection_group = QGroupBox("Детекция")
-        detection_layout = QVBoxLayout(detection_group)
+        self.detection_btn = QPushButton("Запуск распознавания")
+        self.detection_btn.setMinimumHeight(35)
+        self.detection_btn.clicked.connect(self.on_detection_btn_clicked)
+        self.detection_btn.setEnabled(False)
 
-        detection_buttons_layout = QHBoxLayout()
-        self.start_detection_btn = QPushButton("НАЧАТЬ РАСПОЗНАВАНИЕ")
-        self.start_detection_btn.setMinimumHeight(35)
-        self.start_detection_btn.clicked.connect(self.start_detection)
-        self.start_detection_btn.setEnabled(False)
-        detection_buttons_layout.addWidget(self.start_detection_btn)
-
-        self.stop_detection_btn = QPushButton("ОСТАНОВИТЬ РАСПОЗНАВАНИЕ")
-        self.stop_detection_btn.setMinimumHeight(35)
-        self.stop_detection_btn.clicked.connect(self.stop_detection)
-        self.stop_detection_btn.setEnabled(False)
-        detection_buttons_layout.addWidget(self.stop_detection_btn)
-
-        detection_layout.addLayout(detection_buttons_layout)
 
         confidence_layout = QHBoxLayout()
         confidence_layout.addWidget(QLabel("Порог уверенности:"))
@@ -268,9 +226,11 @@ class MonitoringTab(QWidget):
 
         self.confidence_widget = QWidget()
         self.confidence_widget.setLayout(confidence_layout)
-
-        detection_layout.addWidget(self.confidence_widget)
-        left_layout.addWidget(detection_group)
+        self.detection_btn.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        buttons_layout.addWidget(self.video_btn, stretch=1)
+        buttons_layout.addWidget(self.detection_btn, stretch=1)
+        buttons_layout.addStretch(1)
+        buttons_layout.addWidget(self.confidence_widget, stretch=2)
 
         info_widget = QWidget()
         info_layout = QHBoxLayout(info_widget)
@@ -286,11 +246,48 @@ class MonitoringTab(QWidget):
 
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
+        right_panel.setObjectName("rightPanel")
+        up_btn_layout = QHBoxLayout()
 
-        violations_group = QGroupBox("Последние нарушения")
+        switch_tap_btn = GradientOutlineButton(
+            "Журнал",
+            left_icon_path="../../resources/icons/ic_camera.png",
+            right_icon_path="../../resources/icons/ic_arrow.png"
+        )
+        switch_tap_btn.clicked_callback = self.on_switch_btn_click
+        up_btn_layout.addWidget(switch_tap_btn)
+        up_btn_layout.setAlignment(switch_tap_btn, Qt.AlignRight)
+
+        right_layout.addLayout(up_btn_layout)
+
+        violations_group = QWidget()
+        self.violations_label = QLabel("Последние нарушения")
+        self.violations_label.setObjectName("funcLabel")
+
+        line = QFrame()
+        line.setObjectName("line")
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+
+        line_bottom = QFrame()
+        line_bottom.setObjectName("line")
+        line_bottom.setFrameShape(QFrame.HLine)
+        line_bottom.setFrameShadow(QFrame.Sunken)
+
         violations_layout = QVBoxLayout(violations_group)
         self.violations_list = QListWidget()
+        self.violations_list.setWordWrap(True)
+        self.violations_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+
+        violations_layout.addWidget(self.violations_label)
+        violations_layout.addSpacing(40)
+        violations_layout.addWidget(line)
+        violations_layout.addSpacing(20)
         violations_layout.addWidget(self.violations_list)
+        violations_layout.addSpacing(20)
+        violations_layout.addWidget(line_bottom)
+        violations_layout.addSpacing(40)
 
         log_buttons_layout = QHBoxLayout()
         log_buttons_layout.addStretch()
@@ -304,14 +301,18 @@ class MonitoringTab(QWidget):
         right_layout.addWidget(violations_group)
         right_layout.addWidget(header_widget)
 
-        content_splitter.addWidget(left_panel)
-        content_splitter.addWidget(right_panel)
-        content_splitter.setSizes([800, 400])
+        content_layout.addWidget(left_panel)
+        content_layout.addWidget(right_panel)
+        content_layout.setStretch(0, 8)
+        content_layout.setStretch(1, 2)
 
-        monitor_layout.addWidget(content_splitter)
+        monitor_layout.addLayout(content_layout)
 
         self.source_combo.currentIndexChanged.connect(self.on_source_changed)
         self.on_source_changed(0)
+
+    def on_switch_btn_click(self):
+        self.main_window.setCurrentIndex(1)
 
     def set_addr_auto(self):
         result = self.thresholdManager.get_all_rtsp_urls()
@@ -328,21 +329,27 @@ class MonitoringTab(QWidget):
         if source_type == 'camera':
             self.camera_combo.setVisible(True)
             self.multi_camera_widget.setVisible(False)
+            self.multi_cam_container.setVisible(False)
+            self.video_container.setVisible(True)
             self.single_video_label.setVisible(True)
             self.confidence_widget.setVisible(True)
         elif source_type == 'video':
             self.video_path_label.setVisible(True)
             self.browse_btn.setVisible(True)
+            self.multi_cam_container.setVisible(False)
             self.multi_camera_widget.setVisible(False)
+            self.video_container.setVisible(True)
             self.single_video_label.setVisible(True)
             self.confidence_widget.setVisible(True)
         elif source_type == 'rtsp':
             self.rtsp_input.setVisible(True)
             self.add_rtsp_btn.setVisible(True)
+            self.multi_cam_container.setVisible(True)
             self.single_video_label.setVisible(False)
-            self.multi_camera_widget.setMaximumHeight(600)
+            self.video_container.setVisible(False)
             self.multi_camera_widget.set_max_width(1400)
             self.multi_camera_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
             active_count = len([a for a in self.rtsp_addresses if a])
             if active_count > 0:
                 self.multi_camera_widget.setVisible(True)
@@ -351,11 +358,14 @@ class MonitoringTab(QWidget):
                 self.multi_camera_widget.setVisible(False)
             self.confidence_widget.setVisible(False)
         self.rtsp_input.setStyleSheet("""
-            QLineEdit {
+             QLineEdit {
+                background: #323055;
                 border: 1px solid #3a424e;
-                border-radius: 4px;
+                border-radius: 10px;
                 padding: 4px;
+                color: white;
             }
+
         """)
 
     def check_rtsp_url(self) -> bool:
@@ -367,18 +377,22 @@ class MonitoringTab(QWidget):
     def on_rtsp_text_changed(self):
         if self.check_rtsp_url():
             self.rtsp_input.setStyleSheet("""
-                QLineEdit {
-                    border: 1px solid #3a424e;
-                    border-radius: 4px;
-                    padding: 4px;
-                }
+            QLineEdit {
+                background: #323055;
+                border: 1px solid #3a424e;
+                border-radius: 10px;
+                padding: 4px;
+                color: white;
+            }
             """)
         else:
             self.rtsp_input.setStyleSheet("""
                 QLineEdit {
+                    background: #323055;
                     border: 2px solid red;
                     border-radius: 4px;
                     padding: 4px;
+                    color: white;
                 }
             """)
 
@@ -397,9 +411,19 @@ class MonitoringTab(QWidget):
             self.video_path_label.setToolTip(filename)
             self.current_video_path = filename
 
+    def on_video_btn_clicked(self):
+        if not self.is_video_running:
+            self.start_video()
+            if self.is_video_running:
+                self.video_btn.setText("Остановка видео")
+        else:
+            self.stop_video()
+            self.is_video_running = False
+            self.video_btn.setText("Запуск видео")
+
     def start_video(self):
         source_type = self.source_combo.currentData()
-
+        self.video_btn.setEnabled(False)
         self.stop_video()
 
         if source_type == 'camera':
@@ -413,6 +437,7 @@ class MonitoringTab(QWidget):
 
         elif source_type == 'rtsp':
             active_addresses = [addr for addr in self.rtsp_addresses if addr]
+
             if not active_addresses:
                 QMessageBox.warning(self, "Warning", "Нет настроенных RTSP-камер. Добавьте адреса.")
                 return
@@ -422,44 +447,39 @@ class MonitoringTab(QWidget):
             self.multi_camera_widget.set_camera_count(len(active_addresses))
             self.single_video_label.setVisible(False)
             self.progress_bar.setVisible(False)
+
             self.camera_last_frame.clear()
             self.camera_last_displayed_frame.clear()
             self.camera_last_detections.clear()
             self.camera_manager.start_all()
 
-        self.start_btn.setEnabled(False)
-        self.stop_btn.setEnabled(True)
-        self.start_detection_btn.setEnabled(True)
+        self.video_btn.setEnabled(True)
+        self.is_video_running = True
+
+        self.detection_btn.setEnabled(True)
 
         self.display_timer.start(67)
 
     def stop_video(self):
+        self.video_btn.setEnabled(False)
+        self.stop_detection()
         if self.single_video_thread and self.single_video_thread.isRunning():
             self.single_video_thread.stop()
             self.single_video_thread.wait(1000)
             self.single_video_thread = None
-
         self.camera_manager.stop_all()
-        self.multi_camera_mode = False
 
         self._clear_camera_state()
 
-        self._stop_detection_threads()
-
         self.display_timer.stop()
-
-        self.start_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
-        self.start_detection_btn.setEnabled(False)
-        self.stop_detection_btn.setEnabled(False)
-
+        self.video_btn.setEnabled(True)
+        self.is_video_running = False
+        self.detection_btn.setEnabled(False)
         self.single_video_label.setText("\n\nВыберите источник видеопотока")
         self.ui_handler.update_status("")
         self.fps_label.setText("FPS: 0")
-        self.progress_bar.setVisible(False)
-
         self.current_frame = None
-        self.multi_camera_widget.setVisible(False)
+        self.video_btn.setEnabled(True)
 
     def on_video_finished(self):
         self.stop_video()
@@ -473,6 +493,12 @@ class MonitoringTab(QWidget):
         show_error(self, error_code, message)
         self.stop_video()
 
+    def on_detection_btn_clicked(self):
+        if self.video_processor.is_detecting:
+            self.stop_detection()
+        else:
+            self.start_detection()
+
     def start_detection(self):
         if not self.video_processor.model:
             QMessageBox.warning(self, "Warning", "Model not loaded!")
@@ -480,14 +506,16 @@ class MonitoringTab(QWidget):
 
         self.video_processor.is_detecting = True
         self.ui_handler.update_status("В процессе")
-        self.start_detection_btn.setEnabled(False)
-        self.stop_detection_btn.setEnabled(True)
+        self.detection_btn.setText("Остановка распознавания")
+
 
     def stop_detection(self):
         self.video_processor.is_detecting = False
-        self.start_detection_btn.setEnabled(True)
-        self.stop_detection_btn.setEnabled(False)
+        self._stop_detection_threads()
+        self.detection_btn.setText("Запуск распознавания")
         self.ui_handler.update_status("Остановлено")
+        self.detection_btn.setEnabled(True)
+        self.clear_detection_state()
 
     def on_frame_received(self, frame, source_id):
         self.current_frame = frame
@@ -693,8 +721,7 @@ class MonitoringTab(QWidget):
 
 
     def _sync_cameras_with_addresses(self, new_addresses: list):
-        self.camera_manager.stop_all()
-        self._clear_camera_state()
+        self.stop_video()
 
         for manager_idx in self.camera_index_map.values():
             try:
@@ -729,8 +756,8 @@ class MonitoringTab(QWidget):
             if fps_signal:
                 fps_signal.connect(lambda fps, idx=ui_idx: self.on_camera_fps(idx, fps))
 
-            if self.stop_btn.isEnabled():
-                self.camera_manager.start_camera(manager_idx)
+            # if not self.is_video_running:
+            #     self.camera_manager.start_camera(manager_idx)
 
         self.rtsp_addresses = new_addresses.copy()
         self.multi_camera_widget.set_addresses(new_addresses)
@@ -755,15 +782,25 @@ class MonitoringTab(QWidget):
         return thread
 
     def _clear_camera_state(self):
-        self.camera_detection_in_progress.clear()
+
         self.camera_last_detection_time.clear()
         self.camera_original_frames.clear()
         self.camera_displayed_frames.clear()
         self.camera_last_frame.clear()
         self.camera_last_displayed_frame.clear()
         self.camera_last_detections.clear()
+        self.camera_tracking_managers.clear()
+        self.multi_camera_widget.clear_all()
+
+    def clear_detection_state(self):
+        self.camera_detection_in_progress.clear()
+        self.last_detections.clear()
+        self.last_tracks.clear()
+        self.last_violations.clear()
         self.camera_last_detections.clear()
         self.camera_tracking_managers.clear()
+
+
 
     def _start_single_video(self, source_type, source_path):
         self.single_video_thread = VideoThread(source_type, source_path)

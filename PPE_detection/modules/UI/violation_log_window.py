@@ -1,5 +1,9 @@
+import os
+
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout,
-                             QWidget, QTableWidget, QHeaderView, QTableWidgetItem, QPushButton, QLabel, QComboBox)
+                             QWidget, QTableWidget, QHeaderView, QTableWidgetItem, QPushButton, QLabel, QComboBox,
+                             QSizePolicy)
 from PyQt5.QtWidgets import QFileDialog
 
 
@@ -7,9 +11,11 @@ from PyQt5.QtWidgets import QStyledItemDelegate
 from PyQt5.QtCore import Qt, QSize, QDate, QTime
 
 from modules.UI.filter_panel import FilterPanel
+from modules.UI.gradient_outline_button import GradientOutlineButton
 from modules.UI.pagination_panel import PaginationPanel
 from modules.database.sqlite_logger import SQLiteLogger
 from modules.utils.export_log import export_to_pdf, export_to_csv, export_to_xlsx
+from modules.utils.style_loader import StyleLoader
 
 VIOLATION_MAP = {
     "Без каски": "no_helmet",
@@ -30,11 +36,12 @@ SORT_ORDER_MAP = {
     "По убыванию": "DESC"
 }
 
+
 class ViolationLogsTab(QWidget):
 
-    def __init__(self, logger, main_log_path):
+    def __init__(self, logger,  main_window):
         super().__init__()
-
+        self.main_window = main_window
         self.pagination = None
         self.refresh_btn = None
         self.per_page_combo = None
@@ -52,46 +59,26 @@ class ViolationLogsTab(QWidget):
         self._initializing = True
         self.init_ui()
         self._initializing = False
-
         self._load_page()
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
-
+        main_layout.setContentsMargins(0, 0, 0, 0)
         horizontal_layout = QHBoxLayout(self)
         log_layout = QVBoxLayout(self)
+        log_layout.setContentsMargins(20, 20, 20, 20)
         self.table = QTableWidget()
         self.table.setItemDelegate(PaddingDelegate(left=8))
 
         self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels([
-            "Дата", "Время", "ID нарушителя", "Тип нарушения", "Вероятность нарушения", "ID камеры", "Путь к скриншоту"
+            "Дата", "Время", "ID нарушителя", "Тип нарушения", "Вероятность", "ID камеры", "Путь к скриншоту"
         ])
 
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setAlternatingRowColors(True)
-        self.table.setStyleSheet("""
-                    QTableWidget {
-                        background-color: #1a1f25;
-                        alternate-background-color: #222831;
-                        color: #ffffff;
-                        border-radius: 8px; 
-                        border: 1px solid #2a2e35;
-                    }
-                    QHeaderView::section {
-                        background-color: #2a2e35;
-                        color: #8a94a6;
-                        padding: 6px;ThresholdManager
-                        border: none;
-                    }
-                        QTableWidget::item {
-                        padding-left: 8px;  
-                    }
-                    QTableWidget::item:selected {
-                        background-color: #3a7fff;
-                        color: #ffffff;
-                    }
-                """)
+        stylesheet = StyleLoader.load_stylesheet("table_style.qss")
+        self.table.setStyleSheet(stylesheet)
         self.table.verticalHeader().setVisible(False)
         self.filter_panel = FilterPanel()
         self.filter_panel.downloadRequested.connect(self.download_report)
@@ -101,12 +88,12 @@ class ViolationLogsTab(QWidget):
         per_page_layout = QHBoxLayout()
         per_page_layout.setAlignment(Qt.AlignRight)
 
-
         label = QLabel("Строк на странице:")
-        label.setStyleSheet("color: #b0b0b0; font-size: 13px;")
-
+        combo_box_stylesheet = StyleLoader.load_stylesheet("combo_box_general_style.qss")
+        self.setStyleSheet(combo_box_stylesheet)
         self.per_page_combo = QComboBox()
         self.per_page_combo.addItems(["10", "25", "50", "100"])
+        self.per_page_combo.setStyleSheet(combo_box_stylesheet)
         self.per_page_combo.setCurrentText("25")
         self.per_page_combo.currentTextChanged.connect(self._on_per_page_changed)
         self.per_page_combo.setFixedWidth(80)
@@ -116,14 +103,39 @@ class ViolationLogsTab(QWidget):
 
         log_layout.addLayout(per_page_layout)
         log_layout.addWidget(self.table)
-        horizontal_layout.addLayout(log_layout, stretch=5)
-        horizontal_layout.addWidget(self.filter_panel, stretch=2)
-        main_layout.addLayout(horizontal_layout)
-        self.refresh_btn = QPushButton("Обновить")
 
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_panel.setObjectName("rightPanel")
+        up_btn_layout = QHBoxLayout()
+        switch_tap_btn = GradientOutlineButton(
+            "Мониторинг",
+            left_icon_path="../../resources/icons/ic_log.png",
+            right_icon_path="../../resources/icons/ic_arrow.png"
+        )
+        switch_tap_btn.clicked_callback = self.on_switch_btn_click
+        up_btn_layout.addWidget(switch_tap_btn)
+        up_btn_layout.setAlignment(switch_tap_btn, Qt.AlignRight)
+
+        right_layout.addLayout(up_btn_layout)
+        spacer = QWidget()
+        spacer.setFixedWidth(20)
+        spacer.setStyleSheet("background-color: transparent;")
+        horizontal_layout.addLayout(log_layout, stretch=5)
+        horizontal_layout.addWidget(spacer)
+        horizontal_layout.addWidget(right_panel, stretch=2)
+        right_layout.addWidget(self.filter_panel)
+        main_layout.addLayout(horizontal_layout)
+        self.refresh_btn = QPushButton()
+        self.refresh_btn.setObjectName("refreshButton")
+        self.refresh_btn.setIcon(QIcon("../../resources/icons/ic_refresh.png"))
         self.refresh_btn.setIconSize(QSize(24, 24))
         self.refresh_btn.setToolTip("Обновить")
         self.refresh_btn.clicked.connect(self._load_page)
+        self.refresh_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        size = 36
+        self.refresh_btn.setFixedSize(size, size)
+        self.refresh_btn.setIconSize(QSize(24, 24))
 
         self.pagination = PaginationPanel()
         pages_reload_layout = QHBoxLayout()
@@ -346,7 +358,8 @@ class ViolationLogsTab(QWidget):
             from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Ошибка", f"Не удалось создать отчёт:\n{str(e)}")
 
-
+    def on_switch_btn_click(self):
+        self.main_window.setCurrentIndex(0)
 
 class PaddingDelegate(QStyledItemDelegate):
     def __init__(self, left=8, parent=None):

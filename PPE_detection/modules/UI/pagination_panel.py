@@ -1,13 +1,19 @@
+import os
+
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QComboBox)
+    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton)
 from PyQt5.QtCore import Qt, pyqtSignal
 
 
 class PaginationPanel(QWidget):
     pageChanged = pyqtSignal(int)
+
     def __init__(self, parent=None):
         super().__init__(parent)
-
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        left_icon_path = os.path.join(base_dir, "..", "..", "resources", "icons", "ic_arrow_back.png")
+        right_icon_path = os.path.join(base_dir, "..", "..", "resources", "icons", "ic_arrow_next.png")
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(5, 10, 5, 5)
         main_layout.setSpacing(4)
@@ -15,19 +21,22 @@ class PaginationPanel(QWidget):
 
         nav_layout = QHBoxLayout()
         nav_layout.setAlignment(Qt.AlignCenter)
-        nav_layout.setSpacing(10)
+        nav_layout.setSpacing(0)
 
-        self.prev_btn = QPushButton("⟨")
+        self.prev_btn = QPushButton(QIcon(left_icon_path), "")
+        self.prev_btn.setObjectName("leftPageButton")
         self.prev_btn.setFixedSize(30, 30)
         self.prev_btn.setCursor(Qt.PointingHandCursor)
 
-        self.page_label = QLabel("1 of 1")
+        self.page_label = QLabel("1 из 1")
+        self.page_label.setObjectName("pageLabel")
         self.page_label.setAlignment(Qt.AlignCenter)
-        self.page_label.setStyleSheet("font-weight: bold; font-size: 15px; color: #e0e0e0;")
 
-        self.next_btn = QPushButton("⟩")
+        self.next_btn = QPushButton(QIcon(right_icon_path), "")
+        self.next_btn.setObjectName("rightPageButton")
         self.next_btn.setFixedSize(30, 30)
         self.next_btn.setCursor(Qt.PointingHandCursor)
+
 
         nav_layout.addWidget(self.prev_btn)
         nav_layout.addWidget(self.page_label)
@@ -40,40 +49,6 @@ class PaginationPanel(QWidget):
         self._current_page = 1
         self._total_pages = 1
         self._update_ui()
-
-
-        self.setStyleSheet("""
-            QPushButton {
-                background-color: #2b2f36;
-                color: #ffffff;
-                border: 1px solid #444a55;
-                border-radius: 8px;
-                font-size: 12px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #3a3f49;
-                border: 1px solid #5a6472;
-            }
-            QPushButton:pressed {
-                background-color: #4a7cff;
-                border: 1px solid #4a7cff;
-            }
-            QLabel {
-                color: #e0e0e0;
-            }
-            QComboBox {
-                background-color: #2b2f36;
-                color: #ffffff;
-                border: 1px solid #555b66;
-                border-radius: 6px;
-                padding: 4px 8px;
-                font-size: 13px;
-            }
-            QComboBox:hover {
-                background-color: #353a43;
-            }
-        """)
 
     def go_prev(self):
         if self._current_page > 1:
@@ -99,7 +74,7 @@ class PaginationPanel(QWidget):
         self.pageChanged.emit(self._current_page)
 
     def _update_ui(self):
-        self.page_label.setText(f"{self._current_page} of {self._total_pages}")
+        self.page_label.setText(f"{self._current_page} из {self._total_pages}")
         self.prev_btn.setEnabled(self._current_page > 1)
         self.next_btn.setEnabled(self._current_page < self._total_pages)
 

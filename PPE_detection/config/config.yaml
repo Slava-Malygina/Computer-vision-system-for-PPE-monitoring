@@ -2,12 +2,12 @@ cameras:
 - rtsp_url: rtsp://localhost:8554/stream1
   detection_thresholds:
     head: 0.36
-    helmet: 0.57
-    body: 0.72
-    vest: 0.43
-    palm: 0.56
-    glove: 0.34
-    person: 0.42
+    helmet: 0.54
+    body: 0.48
+    vest: 0.4
+    palm: 0.43
+    glove: 0.43
+    person: 0.46
 - rtsp_url: rtsp://localhost:8554/stream2
   detection_thresholds:
     head: 0.4
@@ -34,6 +34,4 @@ cameras:
     vest: 0.3
     palm: 0.3
     glove: 0.2
-    person: 0.61
-
-
+    person: 0.68

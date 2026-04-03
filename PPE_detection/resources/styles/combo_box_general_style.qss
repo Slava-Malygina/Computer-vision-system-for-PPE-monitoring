@@ -1,0 +1,50 @@
+QComboBox {
+    background-color: rgba(50, 48, 85, 200);
+    color: #ffffff;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 14px;
+    min-width: 150px;
+}
+
+QComboBox:hover {
+    border-color: #7DCFFF;
+    background-color: #282650;
+}
+QComboBox::drop-down {
+    border: none;
+    width: 25px;
+    background: qlineargradient(
+        x1: 0, y1: 0, x2: 0, y2: 1,
+        stop: 0 #E677FF,
+        stop: 0.5 #7C79FC,
+        stop: 1 #7DCFFF
+    );
+    border-top-right-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
+QComboBox::down-arrow {
+    image: url(../../resources/icons/ic_arrow_down.png);  /* путь к вашей иконке */
+    width: 14px;
+    height: 14px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: rgba(50, 48, 85, 200);
+    border-radius: 10px;
+    color: #ffffff;
+    selection-background-color: #282650;
+    selection-color: white;
+}
+
+QComboBox QAbstractItemView::item {
+    height: 32px;
+    color: #ffffff;
+    padding: 5px 10px;
+}
+
+QComboBox QAbstractItemView::item:hover {
+    background-color: #2a2e35;
+    color: #ffffff;
+}

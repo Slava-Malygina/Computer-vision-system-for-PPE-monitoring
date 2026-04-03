@@ -34,7 +34,7 @@ class UIHandler:
 
             scaled_pixmap = pixmap.scaled(
                 self.single_video_label.width() - 10,
-                self.single_video_label.height() - 10,
+                self.single_video_label.height(),
                 Qt.KeepAspectRatio,
                 Qt.SmoothTransformation
             )

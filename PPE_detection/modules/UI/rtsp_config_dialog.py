@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
 )
 
 from modules.UI.detection_threshold_dialog import DetectionThresholdsDialog
+from modules.utils.style_loader import StyleLoader
 from modules.utils.threshold_manager import ThresholdManager
 
 DEFAULT_THRESHOLDS = {
@@ -27,7 +28,7 @@ class RtspConfigDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Настройка IP-камер")
         self.setModal(True)
-        self.resize(520, 280)
+        self.resize(620, 280)
         self.settings_buttons = []
         self.rtsp_inputs = []
         self.remove_buttons = []
@@ -39,6 +40,9 @@ class RtspConfigDialog(QDialog):
 
     def _init_ui(self, existing_addresses):
         main_layout = QVBoxLayout(self)
+        stylesheet = StyleLoader.load_stylesheet("main_style.qss")
+        self.setStyleSheet(stylesheet)
+
         main_layout.setSpacing(12)
         header = QLabel("Настройка камер")
         header.setStyleSheet("font-weight: bold; font-size: 13pt; margin-bottom: 5px;")
@@ -59,7 +63,7 @@ class RtspConfigDialog(QDialog):
             settings_btn.setToolTip("Настройки камеры")
             settings_btn.setStyleSheet("""
                     QToolButton {
-                        background-color: #3498db;
+                        background-color: #5D4981;
                         color: white;
                         border: none;
                         border-radius: 3px;
@@ -75,7 +79,7 @@ class RtspConfigDialog(QDialog):
             line_edit.setClearButtonEnabled(True)
             line_edit.setText(existing_addresses[i] if i < len(existing_addresses) else "")
             line_edit.textChanged.connect(lambda _, idx=i: self._on_text_changed(idx))
-
+            line_edit.setStyleSheet("color: white;")
 
             remove_btn = QToolButton()
             remove_btn.setText("✕")
@@ -109,19 +113,7 @@ class RtspConfigDialog(QDialog):
         btn_layout = QHBoxLayout()
         session_save_btn = QPushButton("Сохранить для сессии")
         session_save_btn.setToolTip("Сохранить настройки только для текущей сессии")
-        session_save_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #f39c12;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 6px 12px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #e67e22;
-            }
-        """)
+
         session_save_btn.clicked.connect(self._save_session_settings)
 
         btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -144,7 +136,7 @@ class RtspConfigDialog(QDialog):
         else:
             is_valid = text == "" or text.lower().startswith(("rtsp://", "rtsps://", "rtmp://"))
 
-        edit.setStyleSheet("" if is_valid else "border: 1px solid #e74c3c; border-radius: 3px;")
+        edit.setStyleSheet("color: white;" if is_valid else "border: 1px solid #e74c3c; border-radius: 3px; color: white;")
         self.remove_buttons[index].setEnabled(bool(text))
 
     def get_addresses(self):

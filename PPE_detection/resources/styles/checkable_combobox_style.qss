@@ -1,0 +1,311 @@
+CheckableComboBox {
+    background-color: rgba(50, 48, 85, 200);
+    color: #ffffff;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 14px;
+    min-width: 150px;
+}
+
+CheckableComboBox:hover {
+    border-color: #7DCFFF;
+    background-color: #282650;
+}
+
+CheckableComboBox::drop-down {
+    border: none;
+    width: 25px;
+    background: qlineargradient(
+        x1: 0, y1: 0, x2: 0, y2: 1,
+        stop: 0 #E677FF,
+        stop: 0.5 #7C79FC,
+        stop: 1 #7DCFFF
+    );
+    border-top-right-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
+CheckableComboBox::down-arrow {
+    image: url(../../resources/icons/ic_arrow_down.png);
+    width: 14px;
+    height: 14px;
+}
+
+
+
+CheckableComboBox QAbstractItemView {
+    background-color: rgba(50, 48, 85, 200);
+    border-radius: 10px;
+    color: #ffffff;
+    selection-background-color: #282650;
+    selection-color: white;
+    outline: 0px;
+}
+
+CheckableComboBox QAbstractItemView::item {
+    height: 32px;
+    color: #ffffff;
+    padding: 5px 10px;
+}
+
+CheckableComboBox QAbstractItemView::item:hover {
+    background-color: #2a2e35;
+    color: #ffffff;
+}
+
+
+QDateEdit, QTimeEdit {
+    background-color: rgba(50, 48, 85, 200);
+    color: #ffffff;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 14px;
+    min-width: 150px;
+}
+
+QDateEdit:hover, QTimeEdit:hover {
+    border-color: #7DCFFF;
+    background-color: #282650;
+}
+
+QDateEdit::drop-down {
+    border: none;
+    width: 25px;
+    background: qlineargradient(
+        x1: 0, y1: 0, x2: 0, y2: 1,
+        stop: 0 #E677FF,
+        stop: 0.5 #7C79FC,
+        stop: 1 #7DCFFF
+    );
+    border-top-right-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
+QDateEdit::down-arrow, QTimeEdit::down-arrow {
+    image: url(../../resources/icons/ic_arrow_down.png);
+    width: 14px;
+    height: 14px;
+}
+
+QDateEdit QCalendarWidget {
+    background-color: rgba(50, 48, 85, 200);
+    border-radius: 10px;
+    color: #ffffff;
+    selection-background-color: #282650;
+    selection-color: white;
+}
+
+QTimeEdit {
+    background-color: rgba(50, 48, 85, 200);
+    color: #ffffff;
+    padding: 8px 12px;
+    font-size: 14px;
+    min-width: 150px;
+}
+
+QTimeEdit:hover {
+    border-color: #7DCFFF;
+    background-color: #282650;
+}
+
+QTimeEdit::drop-down {
+    border: none;
+    width: 25px;
+        background: qlineargradient(
+        x1: 0, y1: 0, x2: 0, y2: 1,
+        stop: 0 #E677FF,
+        stop: 0.5 #7C79FC,
+        stop: 1 #7DCFFF
+    );
+
+}
+
+
+QTimeEdit::up-button {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+        background: qlineargradient(
+        x1: 0, y1: 0, x2: 0, y2: 1,
+        stop: 0 #E677FF,
+        stop: 0.5 #7C79FC,
+        stop: 1 #7DCFFF
+    );
+    border: none;
+    margin: 0px;
+    width: 25px;
+    border-top-right-radius: 10px;
+
+}
+
+QTimeEdit::up-arrow {
+    image: url(../../resources/icons/ic_arrow_up.png);
+    width: 14px;
+    height: 14px;
+}
+
+QTimeEdit::down-button {
+    subcontrol-origin: border;
+    subcontrol-position: bottom right;
+    background: transparent;
+    border: none;
+    border-bottom-right-radius: 10px;
+        background: qlineargradient(
+        x1: 0, y1: 0, x2: 0, y2: 1,
+        stop: 0 #7DCFFF,
+        stop: 0.5 #7C79FC,
+        stop: 1 #E677FF
+    );
+    width: 25px;
+}
+
+QTimeEdit::down-arrow {
+    image: url(../../resources/icons/ic_arrow_down.png);
+    width: 14px;
+    height: 14px;
+}
+
+QTimeEdit QAbstractItemView {
+    background-color: rgba(50, 48, 85, 200);
+    border-radius: 10px;
+    color: #ffffff;
+    selection-background-color: #282650;
+    selection-color: white;
+
+}
+
+ QSpinBox {
+        background-color: rgba(50, 48, 85, 200);
+        color: #ffffff;
+        padding: 8px 12px;
+        border-radius: 10px;
+        font-size: 14px;
+        min-width: 100px;
+    }
+
+    QSpinBox:hover {
+        background-color: #282650;
+    }
+
+    QSpinBox::up-button {
+        subcontrol-origin: border;
+        subcontrol-position: top right;
+        background: qlineargradient(
+            x1: 0, y1: 0, x2: 0, y2: 1,
+            stop: 0 #E677FF,
+            stop: 0.5 #7C79FC,
+            stop: 1 #7DCFFF
+        );
+        width: 25px;
+        border: none;
+        border-top-right-radius: 10px;
+    }
+
+    QSpinBox::up-arrow {
+        image: url(../../resources/icons/ic_arrow_up.png);
+        width: 12px;
+        height: 12px;
+    }
+
+    QSpinBox::down-button {
+        subcontrol-origin: border;
+        subcontrol-position: bottom right;
+        background: qlineargradient(
+            x1: 0, y1: 0, x2: 0, y2: 1,
+            stop: 0 #7DCFFF,
+            stop: 0.5 #7C79FC,
+            stop: 1 #E677FF
+        );
+        width: 25px;
+        border: none;
+        border-bottom-right-radius: 10px;
+    }
+
+    QSpinBox::down-arrow {
+        image: url(../../resources/icons/ic_arrow_down.png);
+        width: 12px;
+        height: 12px;
+    }
+QDateEdit {
+    background-color: rgba(50, 48, 85, 200);
+    color: #ffffff;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 14px;
+    min-width: 150px;
+}
+QDateEdit:hover {
+    background-color: #282650;
+}
+
+
+QCalendarWidget {
+    background-color: #323055;
+    border-radius: 10px;
+}
+
+QCalendarWidget QWidget#qt_calendar_navigationbar {
+    background-color: #2a2e35;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    min-height: 40px;
+}
+
+QCalendarWidget QWidget#qt_calendar_navigationbar QLabel {
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+QCalendarWidget QToolButton {
+    background-color: transparent;
+    color: white;
+    width: 30px;
+    height: 30px;
+    border: none;
+}
+
+QCalendarWidget QToolButton:hover {
+    background-color: #3a424e;
+    border-radius: 6px;
+}
+
+QCalendarWidget QTableView {
+    background-color: #323055;  /* твой фон */
+    selection-background-color: #5D4981;
+    selection-color: white;
+    gridline-color: #2a2e35;
+}
+
+QCalendarWidget QTableView::item {
+    color: white;
+    padding: 8px;
+    border: none;
+}
+
+
+QCalendarWidget QTableView::item:!active {
+    color: #5a6370;
+}
+
+QRadioButton {
+    color: white;
+    font-size: 14px;
+    spacing: 8px;
+}
+
+QRadioButton::indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    border: 2px solid #E677FF;
+    background-color: transparent;
+}
+
+QRadioButton::indicator:checked {
+    background-color: #7DCFFF;
+    border-color: #E677FF;
+}
+
+QRadioButton::indicator:hover {
+    border-color: #7DCFFF;
+}

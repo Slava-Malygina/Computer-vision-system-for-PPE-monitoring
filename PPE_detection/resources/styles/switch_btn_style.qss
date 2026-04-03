@@ -1,0 +1,26 @@
+QFrame#outerFrame {
+    background: qlineargradient(
+        x1: 0, y1: 0, x2: 0, y2: 1,
+        stop: 0 #E677FF,
+        stop: 0.5 #7C79FC,
+        stop: 1 #7DCFFF
+    );
+    border-radius: 17px;
+}
+QWidget#buttonContainer {
+    background-color: #323055;
+    border-radius: 15px;
+}
+ QWidget#buttonContainer:hover {
+    background-color: #211F41;
+}
+
+QWidget#buttonContainer:pressed {
+    background-color: #282650;
+}
+QLabel#buttonText {
+    color: white;
+    font-weight: bold;
+    background-color: transparent;
+    padding: 8px 0px;
+}
