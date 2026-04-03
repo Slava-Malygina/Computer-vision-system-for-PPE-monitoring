@@ -100,7 +100,7 @@ class MonitoringTab(QWidget):
 
     def init_ui(self):
         monitor_layout = QVBoxLayout(self)
-        monitor_layout.setContentsMargins(0, 20, 0, 0)
+        monitor_layout.setContentsMargins(0, 0, 0, 0)
         header_widget = QWidget()
         header_layout = QHBoxLayout(header_widget)
         header_layout.setContentsMargins(2, 2, 2, 2)
@@ -118,7 +118,10 @@ class MonitoringTab(QWidget):
 
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
-
+        spacer = QWidget()
+        spacer.setFixedWidth(20)
+        spacer.setStyleSheet("background-color: transparent;")
+        left_layout.addWidget(spacer)
         video_group = ResizeWatcher()
         video_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         video_layout = QVBoxLayout(video_group)
@@ -765,8 +768,7 @@ class MonitoringTab(QWidget):
 
         for ui_idx, addr in enumerate(active_addresses):
             if ui_idx < len(test_videos):
-                manager_idx = self.camera_manager.add_camera("video", test_videos[ui_idx])
-            else:
+
                 manager_idx = self.camera_manager.add_camera("rtsp", addr)
 
             self.camera_index_map[ui_idx] = manager_idx
@@ -863,7 +865,9 @@ class MonitoringTab(QWidget):
         self.fullscreen_camera_index = camera_index
 
         self.multi_camera_widget.setVisible(False)
+        self.multi_cam_container.setVisible(False)
         self.single_video_label.setVisible(True)
+        self.video_container.setVisible(True)
         self.single_video_label.setMinimumSize(0, 0)
         self.single_video_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
@@ -882,7 +886,9 @@ class MonitoringTab(QWidget):
         self.fullscreen_mode = False
         self.fullscreen_camera_index = None
         self.multi_camera_widget.setVisible(True)
+        self.multi_cam_container.setVisible(True)
         self.single_video_label.setVisible(False)
+        self.video_container.setVisible(False)
         self.single_video_label.setMinimumSize(700, 500)
         self.removeEventFilter(self)
 

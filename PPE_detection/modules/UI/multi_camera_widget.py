@@ -19,7 +19,7 @@ class MultiCameraWidget(QWidget):
         self._fps_values = {}
 
     def set_camera_count(self, count):
-        self._camera_count = max(0, count)
+        self._camera_count = max(0, min(count, 4))
         self._rebuild_grid()
 
     def set_addresses(self, addresses):
