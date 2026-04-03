@@ -58,19 +58,15 @@ class UIHandler:
     def add_violation(self, violation):
         """Добавление нарушения в список"""
         self.violations_log.append(violation)
-
         timestamp = violation['timestamp']
         violation_type = violation['class']
         confidence = violation['confidence']
         human_id = violation['human_id']
-
-        log_entry = f"[{timestamp}] {violation_type} (ID: {human_id}) - {confidence}"
-
+        camera_id = violation.get('camera_id', 'unknown')
+        log_entry = f"[{timestamp}] {violation_type} (ID: {human_id}, камера: {camera_id}) - {confidence}"
         self.violations_list.addItem(log_entry)
         self.violations_list.scrollToBottom()
-
-        unique_violations = len(self.violations_log)
-        self.stats_label.setText(f"Нарушения: {unique_violations}")
+        self.stats_label.setText(f"Нарушения: {len(self.violations_log)}")
 
     def clear_journal(self):
         """Очистка журнала нарушений"""
