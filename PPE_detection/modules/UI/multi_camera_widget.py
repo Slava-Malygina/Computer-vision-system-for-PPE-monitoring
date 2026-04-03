@@ -1,10 +1,12 @@
 import math
 import cv2
 from PyQt5.QtWidgets import QWidget, QGridLayout, QLabel, QVBoxLayout
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
 
 class MultiCameraWidget(QWidget):
+    camera_clicked = pyqtSignal(int)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._grid_layout = QGridLayout(self)
@@ -38,7 +40,6 @@ class MultiCameraWidget(QWidget):
                     display_addr = addr[:19] + "..." + addr[-19:]
                 else:
                     display_addr = addr
-
                 fps = self._fps_values.get(ui_idx, 0)
                 label.setText(f"Адрес: {display_addr} | FPS: {fps:.1f}")
             else:
@@ -64,34 +65,27 @@ class MultiCameraWidget(QWidget):
             container_layout = QVBoxLayout(container)
             container_layout.setContentsMargins(0, 0, 0, 0)
             container_layout.setSpacing(1)
+
             video_label = QLabel()
             video_label.setAlignment(Qt.AlignCenter)
             video_label.setStyleSheet("background-color: #1a1f25; border: 1px solid #2a2e35;")
             video_label.setText(f"Камера {i + 1}")
             container_layout.addWidget(video_label)
             self._labels.append(video_label)
+
             info_label = QLabel("")
             info_label.setStyleSheet("color: #8a94a6; font-size: 9px; background-color: #1a1f25; padding: 2px;")
             info_label.setFixedHeight(20)
-
-            row = i // cols
-            col = i % cols
-
-            if row == 0 and col == 0:
-                info_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            elif row == 0 and col == cols - 1:
-                info_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            elif row == rows - 1 and col == 0:
-                info_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            elif row == rows - 1 and col == cols - 1:
-                info_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            else:
-                info_label.setAlignment(Qt.AlignCenter)
-
             container_layout.addWidget(info_label)
             self._info_labels.append(info_label)
 
+            container.mousePressEvent = lambda event, idx=i: self.camera_clicked.emit(idx)
+            container.setCursor(Qt.PointingHandCursor)
+
+            row = i // cols
+            col = i % cols
             self._grid_layout.addWidget(container, row, col)
+
         self._update_info_labels()
 
     def update_frame(self, camera_index, frame):
@@ -119,9 +113,8 @@ class MultiCameraWidget(QWidget):
         super().resizeEvent(event)
 
     def clear_all(self):
-        for i in range(len(self.cameras)):
+        for i in range(len(self._labels)):
             self.update_frame(i, None)
-
 
     def set_max_width(self, width):
         self.setMaximumWidth(width)
