@@ -1,8 +1,10 @@
 import os
 import time
+import cv2
 from datetime import datetime
 
-from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtCore import QTimer, Qt, QEvent
+from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QSizePolicy
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QListWidget, QSlider, QMessageBox, \
     QSplitter, QComboBox, QFileDialog, QProgressBar, QGroupBox, QLineEdit
@@ -59,10 +61,13 @@ class MonitoringTab(QWidget):
         self.camera_last_displayed_frame = {}
         self.camera_last_detection_time = {}
         self.camera_tracking_managers = {}
-        self.camera_last_detections = {}
 
         self.camera_original_frames = {}
         self.camera_displayed_frames = {}
+
+        # Полноэкранный режим
+        self.fullscreen_mode = False
+        self.fullscreen_camera_index = None
 
         self.init_ui()
         if self.video_processor.load_model():
@@ -81,6 +86,7 @@ class MonitoringTab(QWidget):
             self.conf_label
         )
         self.set_addr_auto()
+        self.multi_camera_widget.camera_clicked.connect(self.enter_fullscreen)
 
     def init_ui(self):
         self.setStyleSheet("""
@@ -311,6 +317,13 @@ class MonitoringTab(QWidget):
         self.source_combo.currentIndexChanged.connect(self.on_source_changed)
         self.on_source_changed(0)
 
+        self.left_panel = left_panel
+        self.right_panel = right_panel
+        self.control_group = control_group
+        self.detection_group = detection_group
+        self.info_widget = info_widget
+        self.header_widget = header_widget
+
     def set_addr_auto(self):
         result = self.thresholdManager.get_all_rtsp_urls()
         self._sync_cameras_with_addresses(result)
@@ -458,6 +471,7 @@ class MonitoringTab(QWidget):
 
         self.current_frame = None
         self.multi_camera_widget.setVisible(False)
+        self.exit_fullscreen()
 
     def on_video_finished(self):
         self.stop_video()
@@ -516,12 +530,14 @@ class MonitoringTab(QWidget):
             self.video_processor.increment_frame_counter()
             for human_id, human_violations in result['violations_dict'].items():
                 for violation in human_violations:
-                    violations.append({
+                    violation_data = {
                         'timestamp': datetime.now().strftime("%H:%M:%S"),
                         'class': violation['violation_type'],
                         'confidence': violation['confidence'],
                         'human_id': human_id,
-                    })
+                        'camera_id': source_id
+                    }
+                    violations.append(violation_data)
                     self.violation_logger.add_frame_violations(
                         frame_counter,
                         {human_id: [violation]},
@@ -547,6 +563,9 @@ class MonitoringTab(QWidget):
         else:
             display_frame = frame
         self.ui_handler.update_frame(camera_index, display_frame)
+
+        if self.fullscreen_mode and camera_index == self.fullscreen_camera_index:
+            self.display_single_frame(display_frame)
 
         if self.video_processor.is_detecting and self.video_processor.model is not None:
             if self.camera_detection_in_progress.get(camera_index, False):
@@ -581,6 +600,9 @@ class MonitoringTab(QWidget):
             draw_detections_on_frame(display_frame, detections)
             self.ui_handler.update_frame(camera_index, display_frame)
 
+            if self.fullscreen_mode and camera_index == self.fullscreen_camera_index:
+                self.display_single_frame(display_frame)
+
             tracker = self.camera_tracking_managers.get(camera_index)
             if tracker is None:
                 from utils.tracking_utils import TrackingManager
@@ -609,7 +631,6 @@ class MonitoringTab(QWidget):
             print(f"Multi-camera detection error for camera {camera_index}: {e}")
         finally:
             self.camera_detection_in_progress[camera_index] = False
-
 
     def on_camera_status(self, camera_index, status):
         self.camera_status[camera_index] = status
@@ -640,7 +661,6 @@ class MonitoringTab(QWidget):
 
             self.ui_handler.update_single_frame(display_frame)
 
-
     def clear_journal(self):
         self.ui_handler.clear_journal()
         self.violation_detector.clear_recorded_violations()
@@ -664,7 +684,6 @@ class MonitoringTab(QWidget):
         self.fps_counter = 0
         self.last_fps_time = time.time()
 
-
     def handle_rtsp_loss(self):
         action = show_rtsp_error(self, "rtsp_lost")
         if action == "retry":
@@ -679,7 +698,6 @@ class MonitoringTab(QWidget):
             return False
 
     def _open_rtsp_config(self):
-
         result = RtspConfigDialog.open_and_get(
             self,
             existing=self.rtsp_addresses,
@@ -762,7 +780,6 @@ class MonitoringTab(QWidget):
         self.camera_last_frame.clear()
         self.camera_last_displayed_frame.clear()
         self.camera_last_detections.clear()
-        self.camera_last_detections.clear()
         self.camera_tracking_managers.clear()
 
     def _start_single_video(self, source_type, source_path):
@@ -786,3 +803,56 @@ class MonitoringTab(QWidget):
 
         if self.detection_thread and self.detection_thread.isRunning():
             self.detection_thread.wait(1000)
+
+    def enter_fullscreen(self, camera_index):
+        if self.fullscreen_mode or not self.multi_camera_mode:
+            return
+        self.fullscreen_mode = True
+        self.fullscreen_camera_index = camera_index
+
+        self.multi_camera_widget.setVisible(False)
+        self.single_video_label.setVisible(True)
+        self.single_video_label.setMinimumSize(0, 0)
+        self.single_video_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        if camera_index in self.camera_displayed_frames:
+            self.display_single_frame(self.camera_displayed_frames[camera_index])
+        elif camera_index in self.camera_original_frames:
+            self.display_single_frame(self.camera_original_frames[camera_index])
+        else:
+            self.single_video_label.setText("Ожидание кадра...")
+
+        self.installEventFilter(self)
+
+    def exit_fullscreen(self):
+        if not self.fullscreen_mode:
+            return
+        self.fullscreen_mode = False
+        self.fullscreen_camera_index = None
+        self.multi_camera_widget.setVisible(True)
+        self.single_video_label.setVisible(False)
+        self.single_video_label.setMinimumSize(700, 500)
+        self.removeEventFilter(self)
+
+    def display_single_frame(self, frame):
+        try:
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            h, w, ch = frame_rgb.shape
+            bytes_per_line = ch * w
+            qt_image = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(qt_image)
+            scaled_pixmap = pixmap.scaled(
+                self.single_video_label.width() - 10,
+                self.single_video_label.height() - 10,
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+            self.single_video_label.setPixmap(scaled_pixmap)
+        except Exception as e:
+            print(f"Display error: {e}")
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.KeyPress and event.key() == Qt.Key_Escape and self.fullscreen_mode:
+            self.exit_fullscreen()
+            return True
+        return super().eventFilter(obj, event)
