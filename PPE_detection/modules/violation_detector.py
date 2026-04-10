@@ -151,5 +151,5 @@ class ViolationDetector:
         return {
             'frame_id': frame_id,
             'violations_dict': new_violations,
-            'screenshot_path': f'frames/frame_{frame_id:06d}.jpg' if new_violations else None
+            'screenshot_path': None
         }
