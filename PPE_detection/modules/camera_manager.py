@@ -64,6 +64,13 @@ class CameraManager(QObject):
         for i in list(self._active_indices):
             self.stop_camera(i)
 
+    def stop_all_and_wait(self, timeout_ms=2000):
+        for i in list(self._active_indices):
+            self.stop_camera(i)
+        for thread in self._cameras:
+            if thread.isRunning():
+                thread.wait(timeout_ms)
+
     def _on_error(self, index, message):
         self.camera_error.emit(index, message)
         self.stop_camera(index)
