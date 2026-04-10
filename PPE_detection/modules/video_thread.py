@@ -150,6 +150,8 @@ class VideoThread(QThread):
 
     def stop(self):
         self.is_running = False
+        if self.cap and self.cap.isOpened():
+            self.cap.release()
 
     def open_rtsp(self, timeout: float = 5.0) -> bool:
         if self.cap is not None:
