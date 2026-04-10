@@ -1,7 +1,7 @@
 import cv2
 import os
 from datetime import datetime
-from utils.tracking_utils import draw_detections_on_frame_with_tracking
+from modules.utils.tracking_utils import draw_detections_on_frame_with_tracking
 
 def save_violation_screenshot(frame, detections, tracks, violations_dict, 
                               frame_id, camera_id, output_dir="violations"):
