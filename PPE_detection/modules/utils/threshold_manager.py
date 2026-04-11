@@ -13,12 +13,19 @@ DEFAULT_THRESHOLDS = {
     'person': 0.7
 }
 
-
 class ThresholdManager(QObject):
     thresholds_updated = pyqtSignal(str, dict)
-    def __init__(self, config_path: str = "..\..\config\config.yaml"):
+
+    def __init__(self, config_path: str = None):
         super().__init__()
-        self.config_path = config_path
+        if config_path is None:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            # project_root = os.path.dirname(current_dir)
+            project_root = os.path.dirname(os.path.dirname(current_dir))
+            # self.config_path = os.path.join(project_root, 'config', 'config.yaml')
+            self.config_path = os.path.join(project_root, 'config', 'config.yaml')
+        else:
+            self.config_path = config_path
         self._thresholds_by_rtsp: Dict[str, Dict[str, float]] = {}
         self.load_config()
 
@@ -65,6 +72,11 @@ class ThresholdManager(QObject):
     def get_all_rtsp_urls(self) -> List[str]:
         """Возвращает список всех RTSP-адресов из конфигурации"""
         return list(self._thresholds_by_rtsp.keys())
+
+    def get_first_4_rtsp_urls(self) -> List[str]:
+        """Возвращает первые 4 RTSP-адреса из конфигурации"""
+        urls = list(self._thresholds_by_rtsp.keys())
+        return urls[:4]
 
     def threshold_exists(self, rtsp_url: str) -> bool:
         return rtsp_url in self._thresholds_by_rtsp

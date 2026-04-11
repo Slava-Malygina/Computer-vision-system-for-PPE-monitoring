@@ -28,12 +28,13 @@ from modules.violation_detector import ViolationDetector
 
 
 class MonitoringTab(QWidget):
+
     def __init__(self, logger, main_window):
         super().__init__()
         self.main_window = main_window
         self.single_video_thread = None
-        self.is_video_running = False
         self.detection_thread = None
+        self._is_video_running = False
         self.detection_threads = []
         self.current_frame = None
         self.frame_counter = 0
@@ -78,6 +79,7 @@ class MonitoringTab(QWidget):
         self.fullscreen_camera_index = None
 
         self.init_ui()
+
         if self.video_processor.load_model():
             self.model_label.setText("Модель: загружена")
         self.detect_cameras()
@@ -327,12 +329,26 @@ class MonitoringTab(QWidget):
         self.control_group = control_group
         self.info_widget = info_widget
         self.header_widget = header_widget
+
+    @property
+    def is_video_running(self):
+        return self._is_video_running
+
+    @is_video_running.setter
+    def is_video_running(self, value):
+        self._is_video_running = value
+        if not value:
+            self.video_btn.setText("Запуск видео")
+        else:
+            self.video_btn.setText("Остановка видео")
+
     def on_switch_btn_click(self):
         self.main_window.setCurrentIndex(1)
 
     def set_addr_auto(self):
-        result = self.thresholdManager.get_all_rtsp_urls()
-        self._sync_cameras_with_addresses(result)
+        result = self.thresholdManager.get_first_4_rtsp_urls()
+        self.rtsp_addresses = [addr for addr in result if addr]
+        self.multi_camera_widget.set_addresses(self.rtsp_addresses)
 
     def on_source_changed(self, index):
         source_type = self.source_combo.currentData()
@@ -341,7 +357,8 @@ class MonitoringTab(QWidget):
         self.browse_btn.setVisible(False)
         self.rtsp_input.setVisible(False)
         self.add_rtsp_btn.setVisible(False)
-
+        if self.is_video_running:
+            self.stop_video()
         if source_type == 'camera':
             self.camera_combo.setVisible(True)
             self.multi_camera_widget.setVisible(False)
@@ -428,19 +445,36 @@ class MonitoringTab(QWidget):
             self.current_video_path = filename
 
     def on_video_btn_clicked(self):
-        if not self.is_video_running:
-            self.start_video()
-            if self.is_video_running:
-                self.video_btn.setText("Остановка видео")
-        else:
-            self.stop_video()
-            self.is_video_running = False
-            self.video_btn.setText("Запуск видео")
+        if hasattr(self, '_video_btn_locked') and self._video_btn_locked:
+
+            return
+
+        self._video_btn_locked = True
+
+        self._original_video_btn_style = self.video_btn.styleSheet()
+
+        self.video_btn.setStyleSheet("""
+            QPushButton {
+                color: #adb5bd;
+            }
+        """)
+        try:
+            if not self.is_video_running:
+                self.start_video()
+            else:
+                self.stop_video()
+        finally:
+
+            QTimer.singleShot(5000, lambda: self._restore_btn())
+
+    def _restore_btn(self):
+        self._video_btn_locked = False
+        self.video_btn.setStyleSheet("")
+
+
 
     def start_video(self):
         source_type = self.source_combo.currentData()
-        self.video_btn.setEnabled(False)
-        self.stop_video()
 
         if source_type == 'camera':
             self._start_single_video(source_type, "camera")
@@ -457,7 +491,7 @@ class MonitoringTab(QWidget):
             if not active_addresses:
                 QMessageBox.warning(self, "Warning", "Нет настроенных RTSP-камер. Добавьте адреса.")
                 return
-
+            self._sync_cameras_with_addresses(active_addresses)
             self.multi_camera_mode = True
             self.multi_camera_widget.setVisible(True)
             self.multi_camera_widget.set_camera_count(len(active_addresses))
@@ -468,8 +502,6 @@ class MonitoringTab(QWidget):
             self.camera_last_displayed_frame.clear()
             self.camera_last_detections.clear()
             self.camera_manager.start_all()
-
-        self.video_btn.setEnabled(True)
         self.is_video_running = True
 
         self.detection_btn.setEnabled(True)
@@ -477,18 +509,18 @@ class MonitoringTab(QWidget):
         self.display_timer.start(67)
 
     def stop_video(self):
-        self.video_btn.setEnabled(False)
+
         self.stop_detection()
         if self.single_video_thread and self.single_video_thread.isRunning():
             self.single_video_thread.stop()
             self.single_video_thread.wait(1000)
             self.single_video_thread = None
         self.camera_manager.stop_all()
-
+        self.camera_manager.clear()
         self._clear_camera_state()
 
         self.display_timer.stop()
-        self.video_btn.setEnabled(True)
+
         self.is_video_running = False
         self.detection_btn.setEnabled(False)
         self.single_video_label.setText("\n\nВыберите источник видеопотока")
@@ -498,6 +530,7 @@ class MonitoringTab(QWidget):
         self.video_btn.setEnabled(True)
         self.multi_camera_widget.setVisible(False)
         self.exit_fullscreen()
+        self.camera_index_map.clear()
 
     def on_video_finished(self):
         self.stop_video()
@@ -744,12 +777,14 @@ class MonitoringTab(QWidget):
             validator=None
         )
         if result is not None:
-            self._sync_cameras_with_addresses(result)
+            self.stop_video()
+            self.rtsp_addresses = result.copy()
         self.rtsp_input.setFocus()
 
     def _sync_cameras_with_addresses(self, new_addresses: list):
-        self.stop_video()
 
+        if self.is_video_running:
+            self.stop_video()
         for manager_idx in self.camera_index_map.values():
             try:
                 self.camera_manager.get_frame_ready_signal(manager_idx).disconnect()
@@ -767,9 +802,9 @@ class MonitoringTab(QWidget):
         test_videos = ["test1.mp4", "test2.mp4", "test3.mp4", "test4.mp4"]
 
         for ui_idx, addr in enumerate(active_addresses):
-            if ui_idx < len(test_videos):
+            # if ui_idx < len(test_videos):
 
-                manager_idx = self.camera_manager.add_camera("rtsp", addr)
+            manager_idx = self.camera_manager.add_camera("rtsp", addr)
 
             self.camera_index_map[ui_idx] = manager_idx
             print(f"Synced: ui_idx={ui_idx}, manager_idx={manager_idx}, addr={addr}")
@@ -795,6 +830,8 @@ class MonitoringTab(QWidget):
             self.multi_camera_widget.set_camera_count(len(active_addresses))
         else:
             self.multi_camera_widget.setVisible(False)
+        print(f"Final camera_index_map: {self.camera_index_map}")
+        print(f"Total cameras in manager: {self.camera_manager.camera_count()}")
 
     def _create_detection_thread(self, frame, source_id, camera_index=None):
         thresholds = self.threshold_manager.get_thresholds(source_id)

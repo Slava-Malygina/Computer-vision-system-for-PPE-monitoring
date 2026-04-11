@@ -36,7 +36,10 @@ class RtspConfigDialog(QDialog):
         self.threshold_manager = ThresholdManager()
         self.session_thresholds = {}
         self.session_addresses = None
-        self._init_ui(existing_addresses or [""] * self.MAX_SOURCES)
+        existing = existing_addresses.copy()
+        while len(existing) < RtspConfigDialog.MAX_SOURCES:
+            existing.append("")
+        self._init_ui(existing or [""] * self.MAX_SOURCES)
 
     def _init_ui(self, existing_addresses):
         main_layout = QVBoxLayout(self)

@@ -60,7 +60,7 @@ class FilterPanel(QWidget):
         filter_layout.addLayout(type_layout)
 
         date_layout = QHBoxLayout()
-        date_layout.addWidget(QLabel("Дата с:"),  stretch=1)
+        date_layout.addWidget(QLabel("Дата с:   "),  stretch=1)
         self.date_from = QDateEdit(QDate.currentDate().addMonths(-1))
         self.date_from.setCalendarPopup(True)
         date_layout.addWidget(self.date_from, stretch=2)

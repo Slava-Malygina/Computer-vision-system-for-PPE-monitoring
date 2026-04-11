@@ -83,3 +83,29 @@ class CameraManager(QObject):
 
     def is_active(self, index):
         return index in self._active_indices
+
+    def clear(self):
+
+        self.stop_all()
+
+        for i, thread in enumerate(self._cameras):
+            if thread.isRunning():
+                thread.stop()
+                if not thread.wait(3000):  #
+                    print(f": Thread {i} не остановлен во время")
+                thread.quit()
+
+        for thread in self._cameras:
+            try:
+                thread.frame_ready.disconnect()
+                thread.status_update.disconnect()
+                thread.fps_updated.disconnect()
+                thread.error_occurred.disconnect()
+            except:
+                pass
+
+        for thread in self._cameras:
+            thread.deleteLater()
+
+        self._cameras.clear()
+        self._active_indices.clear()
