@@ -57,6 +57,7 @@ class CameraManager(QObject):
             self.camera_stopped.emit(index)
 
     def start_all(self):
+        print("Всего камер",len(self._cameras) )
         for i in range(len(self._cameras)):
             self.start_camera(i)
 
@@ -100,7 +101,8 @@ class CameraManager(QObject):
                 thread.stop()
                 if not thread.wait(3000):  #
                     print(f": Thread {i} не остановлен во время")
-                thread.quit()
+                    thread.terminate()
+                    thread.wait(500)
 
         for thread in self._cameras:
             try:
@@ -116,3 +118,5 @@ class CameraManager(QObject):
 
         self._cameras.clear()
         self._active_indices.clear()
+        print(
+            f"[CameraManager] Полная очистка завершена. Камер: {len(self._cameras)}, Активных: {len(self._active_indices)}")

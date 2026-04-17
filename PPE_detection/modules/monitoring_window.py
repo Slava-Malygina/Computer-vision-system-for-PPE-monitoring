@@ -467,6 +467,7 @@ class MonitoringTab(QWidget):
                 self.start_video()
             else:
                 self.stop_video()
+
         finally:
 
             QTimer.singleShot(5000, lambda: self._restore_btn())
@@ -490,6 +491,7 @@ class MonitoringTab(QWidget):
             self._start_single_video(source_type, self.current_video_path)
 
         elif source_type == 'rtsp':
+
             active_addresses = [addr for addr in self.rtsp_addresses if addr]
 
             if not active_addresses:
@@ -521,10 +523,7 @@ class MonitoringTab(QWidget):
             self.single_video_thread.wait(2000)
             self.single_video_thread = None
 
-        self.camera_manager.stop_all()
-        for thread in self.camera_manager._cameras:
-            if thread.isRunning():
-                thread.wait(2000)
+        self.camera_manager.clear()
 
         self._clear_camera_state()
         self.clear_detection_state()
@@ -536,8 +535,6 @@ class MonitoringTab(QWidget):
         self.single_video_label.clear()
         self.single_video_label.setText("\n\nВыберите источник видеопотока")
         self.multi_camera_widget.clear_all()
-        self.multi_camera_widget.setVisible(False)
-
         self.display_timer.stop()
 
         self.is_video_running = False
@@ -546,6 +543,7 @@ class MonitoringTab(QWidget):
         self.fps_label.setText("FPS: 0")
         self.exit_fullscreen()
         self.camera_index_map.clear()
+
 
     def on_video_finished(self):
         self.stop_video()
