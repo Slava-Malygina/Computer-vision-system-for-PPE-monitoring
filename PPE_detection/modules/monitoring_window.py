@@ -26,7 +26,7 @@ from modules.utils.video_processor import VideoProcessor
 from modules.video_thread import VideoThread
 from modules.violation_detector import ViolationDetector
 from modules.utils.screenshot_saver import save_violation_screenshot
-
+from modules.utils.cleanup_manager import cleanup_manager
 
 class MonitoringTab(QWidget):
 
@@ -100,6 +100,9 @@ class MonitoringTab(QWidget):
         self.multi_camera_widget.camera_clicked.connect(self.enter_fullscreen)
 
         self.threshold_manager.thresholds_updated.connect(self.on_thresholds_updated)
+        deleted = cleanup_manager.cleanup_old_screenshots(days=30)
+        if deleted > 0:
+            print(f"[Очистка] Удалено {deleted} старых скриншотов")
 
     def init_ui(self):
         monitor_layout = QVBoxLayout(self)
@@ -711,6 +714,14 @@ class MonitoringTab(QWidget):
             tracks = tracker.update(detections)
             self.camera_last_tracks[camera_index] = tracks
             result = self.violation_detector.process_frame(detections, tracks, frame_counter)
+
+
+            screenshot_path = None
+            if result['violations_dict']:
+                screenshot_path = save_violation_screenshot(
+                    frame, detections, tracks, result['violations_dict'],
+                    frame_counter, source_id
+                )
             display_frame = draw_detections_on_frame_with_tracking(display_frame, detections, tracks, result)
             self.ui_handler.update_frame(camera_index, display_frame)
             for human_id, human_violations in result['violations_dict'].items():
@@ -726,7 +737,7 @@ class MonitoringTab(QWidget):
                         frame_counter,
                         {human_id: [violation]},
                         source_id or f"cam_{camera_index}",
-                        result["screenshot_path"]
+                        screenshot_path
                     )
         except Exception as e:
             print(f"Multi-camera detection error for camera {camera_index}: {e}")
