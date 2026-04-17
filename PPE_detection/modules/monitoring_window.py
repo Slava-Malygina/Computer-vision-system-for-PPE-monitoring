@@ -25,6 +25,7 @@ from modules.utils.ui_handler import UIHandler
 from modules.utils.video_processor import VideoProcessor
 from modules.video_thread import VideoThread
 from modules.violation_detector import ViolationDetector
+from modules.utils.screenshot_saver import save_violation_screenshot
 
 
 class MonitoringTab(QWidget):
@@ -511,24 +512,35 @@ class MonitoringTab(QWidget):
     def stop_video(self):
 
         self.stop_detection()
+
         if self.single_video_thread and self.single_video_thread.isRunning():
             self.single_video_thread.stop()
-            self.single_video_thread.wait(1000)
+            self.single_video_thread.wait(2000)
             self.single_video_thread = None
+
         self.camera_manager.stop_all()
-        self.camera_manager.clear()
+        for thread in self.camera_manager._cameras:
+            if thread.isRunning():
+                thread.wait(2000)
+
         self._clear_camera_state()
+        self.clear_detection_state()
+        self.current_frame = None
+        self.last_detections.clear()
+        self.last_tracks.clear()
+        self.last_violations.clear()
+
+        self.single_video_label.clear()
+        self.single_video_label.setText("\n\nВыберите источник видеопотока")
+        self.multi_camera_widget.clear_all()
+        self.multi_camera_widget.setVisible(False)
 
         self.display_timer.stop()
 
         self.is_video_running = False
         self.detection_btn.setEnabled(False)
-        self.single_video_label.setText("\n\nВыберите источник видеопотока")
         self.ui_handler.update_status("")
         self.fps_label.setText("FPS: 0")
-        self.current_frame = None
-        self.video_btn.setEnabled(True)
-        self.multi_camera_widget.setVisible(False)
         self.exit_fullscreen()
         self.camera_index_map.clear()
 
@@ -568,6 +580,20 @@ class MonitoringTab(QWidget):
         self.detection_btn.setEnabled(True)
         self.clear_detection_state()
 
+        self.last_detections.clear()
+        self.last_tracks.clear()
+        self.last_violations.clear()
+        if not self.multi_camera_mode and self.single_video_label:
+            if self.current_frame is not None:
+                self.ui_handler.update_single_frame(self.current_frame)
+            else:
+                self.single_video_label.clear()
+                self.single_video_label.setText("\n\nВыберите источник видеопотока")
+        else:
+            for idx, frame in self.camera_original_frames.items():
+                if frame is not None:
+                    self.ui_handler.update_frame(idx, frame)
+
     def on_frame_received(self, frame, source_id):
         self.current_frame = frame
 
@@ -581,18 +607,24 @@ class MonitoringTab(QWidget):
                 self.detection_thread.start()
                 self.detection_threads.append(self.detection_thread)
 
+
     def on_detection_done(self, detections, frame, frame_counter, results, source_id):
         try:
             violations = []
             tracks = self.tracking_manager.update(detections)
-
             result = self.violation_detector.process_frame(
                 detections, tracks, frame_counter
             )
-
             self.last_violations = result['violations_dict']
             self.last_detections = detections
             self.last_tracks = tracks
+
+            screenshot_path = None
+            if result['violations_dict']:
+                screenshot_path = save_violation_screenshot(
+                    frame, detections, tracks, result['violations_dict'],
+                    frame_counter, source_id
+                )
 
             self.video_processor.increment_frame_counter()
             for human_id, human_violations in result['violations_dict'].items():
@@ -609,7 +641,7 @@ class MonitoringTab(QWidget):
                         frame_counter,
                         {human_id: [violation]},
                         source_id,
-                        result["screenshot_path"]
+                        screenshot_path
                     )
 
             for violation in violations:
@@ -802,9 +834,9 @@ class MonitoringTab(QWidget):
         test_videos = ["test1.mp4", "test2.mp4", "test3.mp4", "test4.mp4"]
 
         for ui_idx, addr in enumerate(active_addresses):
-            # if ui_idx < len(test_videos):
+            if ui_idx < len(test_videos):
 
-            manager_idx = self.camera_manager.add_camera("rtsp", addr)
+                manager_idx = self.camera_manager.add_camera("rtsp", addr)
 
             self.camera_index_map[ui_idx] = manager_idx
             print(f"Synced: ui_idx={ui_idx}, manager_idx={manager_idx}, addr={addr}")
@@ -830,8 +862,6 @@ class MonitoringTab(QWidget):
             self.multi_camera_widget.set_camera_count(len(active_addresses))
         else:
             self.multi_camera_widget.setVisible(False)
-        print(f"Final camera_index_map: {self.camera_index_map}")
-        print(f"Total cameras in manager: {self.camera_manager.camera_count()}")
 
     def _create_detection_thread(self, frame, source_id, camera_index=None):
         thresholds = self.threshold_manager.get_thresholds(source_id)
