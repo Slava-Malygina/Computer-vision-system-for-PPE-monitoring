@@ -5,7 +5,7 @@ from PyQt5.QtCore import pyqtSignal, QThread
 
 
 class VideoThread(QThread):
-    frame_ready = pyqtSignal(object, str)
+    frame_ready = pyqtSignal(object)
     status_update = pyqtSignal(str)
     progress_update = pyqtSignal(int)
     finished_signal = pyqtSignal()
@@ -29,9 +29,7 @@ class VideoThread(QThread):
         self.last_fps_time = time.time()
 
         try:
-            print(self.source_type)
             if self.source_type == 'rtsp':
-                print(1)
                 self.status_update.emit("RTSP: подключение...")
                 if not self.open_rtsp():
                     self.error_occurred.emit(
@@ -39,11 +37,7 @@ class VideoThread(QThread):
                         f"Не удалось открыть RTSP-поток: {self.source_path}"
                     )
                     return
-                print(2)
                 self.status_update.emit(f"RTSP подключён: {self.source_path}")
-
-                print(f"[RTSP] Поток успешно открыт: {self.source_path}")
-                self.status_update.emit(f"RTSP: {self.source_path}")
 
             elif self.source_type == 'camera':
                 self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
@@ -59,12 +53,11 @@ class VideoThread(QThread):
                 self.status_update.emit("Устройство камеры подключено")
 
             else:
-                self.open_rtsp()
+                self.cap = cv2.VideoCapture(self.source_path)
                 if not self.cap.isOpened():
                     self.status_update.emit(f"Не удалось открыть файл: {os.path.basename(self.source_path)}")
                     self.error_occurred.emit("video_open_failed", "Файл не найден или повреждён")
                     return
-
                 self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
                 self.status_update.emit(f"Видео загружено: {os.path.basename(self.source_path)}")
 
@@ -106,12 +99,11 @@ class VideoThread(QThread):
                         )
                         break
 
-
                     self.frame_count += 1
                     current_time = time.time()
                     if current_time - self.last_fps_time >= 1.0:
-                        self.current_fps = self.frame_count / (current_time - self.last_fps_time)
-                        self.fps_updated.emit(self.current_fps)
+                        current_fps = self.frame_count / (current_time - self.last_fps_time)
+                        self.fps_updated.emit(current_fps)
                         self.frame_count = 0
                         self.last_fps_time = current_time
 
@@ -119,7 +111,8 @@ class VideoThread(QThread):
                         small_frame = frame
                     else:
                         small_frame = cv2.resize(frame, (640, 480))
-                    self.frame_ready.emit(small_frame, self.source_path)
+
+                    self.frame_ready.emit(small_frame)
 
                     if self.source_type == 'video':
                         self.current_frame += 1
@@ -172,4 +165,3 @@ class VideoThread(QThread):
             cap.release()
             time.sleep(0.3)
         return False
-
