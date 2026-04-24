@@ -1,6 +1,6 @@
 from PyQt5.QtCore import QObject, pyqtSignal
-
 from modules.video_thread import VideoThread
+from functools import partial
 
 
 class CameraManager(QObject):
@@ -18,16 +18,11 @@ class CameraManager(QObject):
 
     def add_camera(self, source_type, source_path):
         thread = VideoThread(source_type, source_path)
-        thread.error_occurred.connect(
-            lambda msg, idx=len(self._cameras): self._on_error(idx, msg)
-        )
-        thread.fps_updated.connect(
-            lambda fps, idx=len(self._cameras): self.camera_fps.emit(idx, fps)
-        )
+        idx = len(self._cameras)
+        thread.error_occurred.connect(partial(self._on_error, idx))
         self._cameras.append(thread)
-        index = len(self._cameras) - 1
-        self.camera_added.emit(index)
-        return index
+        self.camera_added.emit(idx)
+        return idx
 
     def get_fps_signal(self, index):
         if 0 <= index < len(self._cameras):
@@ -57,7 +52,6 @@ class CameraManager(QObject):
             self.camera_stopped.emit(index)
 
     def start_all(self):
-        print("Всего камер",len(self._cameras) )
         for i in range(len(self._cameras)):
             self.start_camera(i)
 
@@ -65,15 +59,11 @@ class CameraManager(QObject):
         for i in list(self._active_indices):
             self.stop_camera(i)
 
-    def stop_all_and_wait(self, timeout_ms=2000):
-        for i in list(self._active_indices):
-            self.stop_camera(i)
-        for thread in self._cameras:
-            if thread.isRunning():
-                thread.wait(timeout_ms)
-
-    def _on_error(self, index, message):
-        self.camera_error.emit(index, message)
+    def _on_error(self, index, error_code, message):
+        if not isinstance(index, int):
+            print(f"Ошибка: индекс не число: {index}")
+            return
+        self.camera_error.emit(index, f"{error_code}: {message}")
         self.stop_camera(index)
 
     def get_frame_ready_signal(self, index):
@@ -92,31 +82,19 @@ class CameraManager(QObject):
     def is_active(self, index):
         return index in self._active_indices
 
-    def clear(self):
+    def get_thread(self, index):
+        if 0 <= index < len(self._cameras):
+            return self._cameras[index]
+        return None
 
-        self.stop_all()
+    def clear_all_cameras(self):
+        for i in range(len(self._cameras) - 1, -1, -1):
+            self.remove_camera(i)
 
-        for i, thread in enumerate(self._cameras):
-            if thread.isRunning():
-                thread.stop()
-                if not thread.wait(3000):  #
-                    print(f": Thread {i} не остановлен во время")
-                    thread.terminate()
-                    thread.wait(500)
-
-        for thread in self._cameras:
-            try:
-                thread.frame_ready.disconnect()
-                thread.status_update.disconnect()
-                thread.fps_updated.disconnect()
-                thread.error_occurred.disconnect()
-            except:
-                pass
-
-        for thread in self._cameras:
-            thread.deleteLater()
-
-        self._cameras.clear()
-        self._active_indices.clear()
-        print(
-            f"[CameraManager] Полная очистка завершена. Камер: {len(self._cameras)}, Активных: {len(self._active_indices)}")
+    def stop_all_and_wait(self, timeout=5000):
+        for i in list(self._active_indices):
+            self.stop_camera(i)
+        for i in range(len(self._cameras)):
+            thread = self.get_thread(i)
+            if thread and thread.isRunning():
+                thread.wait(timeout)
