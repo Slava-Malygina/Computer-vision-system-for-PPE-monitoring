@@ -53,6 +53,7 @@ class MainWindow(QMainWindow):
 
 
     def _safe_exit(self):
+        self.monitoring_window.clean_up()
         try:
             self.logger.flush()
         except Exception as e:

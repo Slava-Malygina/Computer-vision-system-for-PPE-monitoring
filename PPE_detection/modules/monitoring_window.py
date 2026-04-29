@@ -43,7 +43,13 @@ class MonitoringTab(QWidget):
         self.threshold_manager = ThresholdManager()
         self.tracking_manager = TrackingManager()
         self.camera_manager = CameraManager()
+        self.camera_manager.camera_error.connect(self.on_camera_error)
         self.video_processor = VideoProcessor(logger, self.camera_manager, self.frame_counter)
+        self._error_shown = set()
+        self._starting_video = False
+        self._video_running = False
+        self._sync_lock = False
+        self._pending_click = False
 
         self.available_cameras = []
         self.violation_detector = ViolationDetector()
@@ -784,11 +790,13 @@ class MonitoringTab(QWidget):
         self.video_processor.set_conf_threshold(conf_value)
         self.ui_handler.update_confidence_label(conf_value)
 
-    def closeEvent(self, event):
+    def clean_up(self):
+        print("Закрытие приложения, остановка потоков.")
         self.stop_video()
+        self.camera_manager.stop_all_and_wait()
         if hasattr(self, 'violation_logger'):
             self.violation_logger.flush()
-        event.accept()
+        print("Приложение завершено.")
 
     def setup_timers(self):
         self.display_timer = QTimer()
@@ -896,6 +904,14 @@ class MonitoringTab(QWidget):
         self.camera_last_detections.clear()
         self.camera_tracking_managers.clear()
         self.multi_camera_widget.clear_all()
+
+    def on_camera_error(self, camera_index, error_msg):
+        print(f"Ошибка камеры {camera_index}: {error_msg}")
+
+        self._error_shown.add(camera_index)
+        QMessageBox.critical(self, "Ошибка", f"Не удалось подключиться к камере {camera_index + 1}:\n{error_msg}")
+        self.camera_manager.stop_camera(camera_index)
+
 
     def clear_detection_state(self):
         self.camera_detection_in_progress.clear()

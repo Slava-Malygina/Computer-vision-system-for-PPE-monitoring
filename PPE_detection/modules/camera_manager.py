@@ -1,6 +1,7 @@
 from PyQt5.QtCore import QObject, pyqtSignal
 
 from modules.video_thread import VideoThread
+from functools import partial
 
 
 class CameraManager(QObject):
@@ -18,16 +19,15 @@ class CameraManager(QObject):
 
     def add_camera(self, source_type, source_path):
         thread = VideoThread(source_type, source_path)
-        thread.error_occurred.connect(
-            lambda msg, idx=len(self._cameras): self._on_error(idx, msg)
-        )
+        idx = len(self._cameras)
+        thread.error_occurred.connect(partial(self._on_error, idx))
         thread.fps_updated.connect(
             lambda fps, idx=len(self._cameras): self.camera_fps.emit(idx, fps)
         )
         self._cameras.append(thread)
-        index = len(self._cameras) - 1
-        self.camera_added.emit(index)
-        return index
+        self.camera_added.emit(idx)
+        return idx
+
 
     def get_fps_signal(self, index):
         if 0 <= index < len(self._cameras):
@@ -75,6 +75,7 @@ class CameraManager(QObject):
     def _on_error(self, index, message):
         self.camera_error.emit(index, message)
         self.stop_camera(index)
+        self.remove_camera(index)
 
     def get_frame_ready_signal(self, index):
         if 0 <= index < len(self._cameras):
