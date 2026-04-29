@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<button id="toggle-panel-btn" class="btn-toggle-fixed">☰</button>
+<div class="main-layout">
+    <div class="table-wrapper" id="table-wrapper">
+        <div class="per-page-selector top">
+            <label>Строк на странице:</label>
+            <select id="per-page">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+       <div class="table-scroll-container">
+        <table class="violations-table">
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Время</th>
+                    <th>ID нарушителя</th>
+                    <th>Тип нарушения</th>
+                    <th>Вероятность</th>
+                    <th>ID камеры</th>
+                    <th>Путь к скриншоту</th>
+                </tr>
+            </thead>
+            <tbody id="violations-tbody">
+                {% for v in violations %}
+                <tr data-camera="{{ v.camera_id }}" data-type="{{ v.violation_type }}">
+                    <td>{{ v.date }}</td>
+                    <td>{{ v.time }}</td>
+                    <td>{{ v.human_id }}</td>
+                    <td>{{ v.violation_type }}</td>
+                    <td>{{ "%.0f"|format(v.confidence * 100) }}%</td>
+                    <td>{{ v.camera_id }}</td>
+                    <td><a href="{{ v.screenshot_path }}" target="_blank">{{ v.screenshot_path }}</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        <div class="pagination-panel bottom">
+            <div class="pagination-controls">
+                <button id="prev-page" disabled>←</button>
+                <span id="page-info">1 из 1</span>
+                <button id="next-page" disabled>→</button>
+            </div>
+            <button id="refresh-btn" class="refresh-btn">
+                <img src="{{ url_for('static', filename='icons/refresh_icn.png') }}" alt="Обновить" style="width: 18px; height: 18px;">
+            </button>
+        </div>
+    </div>
+
+    <div class="right-panel" id="right-panel">
+
+        <div class="filter-section">
+            <h3>Фильтровать</h3>
+
+            <div class="filter-group">
+                <label>По камере:</label>
+                <div class="dropdown-checkbox">
+                    <button type="button" class="dropdown-btn" id="camera-dropdown-btn">
+                        Выбрать камеры <span class="arrow">▼</span>
+                    </button>
+                    <div class="dropdown-content" id="camera-dropdown">
+                        <label><input type="checkbox" value="rtsp://localhost:8554/stream1" checked> rtsp://localhost:8554/stream1</label>
+                        <label><input type="checkbox" value="rtsp://localhost:8554/stream2" checked> rtsp://localhost:8554/stream2</label>
+                        <label><input type="checkbox" value="rtsp://localhost:8554/stream3" checked> rtsp://localhost:8554/stream3</label>
+                        <label><input type="checkbox" value="rtsp://localhost:8554/stream4" checked> rtsp://localhost:8554/stream4</label>
+                        <label><input type="checkbox" value="Веб-камера" checked> Веб-камера</label>
+                        <label><input type="checkbox" value="Видео" checked> Видео</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>По нарушению:</label>
+                <div class="dropdown-checkbox">
+                    <button type="button" class="dropdown-btn" id="violation-dropdown-btn">
+                        Выбрать нарушения <span class="arrow">▼</span>
+                    </button>
+                    <div class="dropdown-content" id="violation-dropdown">
+                        <label><input type="checkbox" value="Без каски" checked> Без каски</label>
+                        <label><input type="checkbox" value="Без жилета" checked> Без жилета</label>
+                        <label><input type="checkbox" value="Без перчаток" checked> Без перчаток</label>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="filter-group date-range-group">
+                <label>Диапазон дат:</label>
+                <div class="date-range-row">
+                    <input type="date" id="date-from" value="2026-03-29">
+                    <span>—</span>
+                    <input type="date" id="date-to" value="2026-04-29">
+                </div>
+            </div>
+
+            <div class="filter-group time-range-group">
+                <label>Диапазон времени:</label>
+                <div class="time-range-row">
+                    <input type="time" id="time-from" value="00:00">
+                    <span>—</span>
+                    <input type="time" id="time-to" value="23:59">
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>Вероятность:</label>
+                <div class="range-slider">
+                    <span id="prob-min-value">0</span>%
+                    <input type="range" id="prob-min" min="0" max="100" value="0">
+                    <input type="range" id="prob-max" min="0" max="100" value="100">
+                    <span id="prob-max-value">100</span>%
+                </div>
+            </div>
+        </div>
+
+        <div class="filter-section">
+            <h3>Сортировать</h3>
+            <div class="filter-group sort-group">
+                <select id="sort-field">
+                    <option value="date">Дата</option>
+                    <option value="time">Время</option>
+                    <option value="confidence">Вероятность</option>
+                </select>
+                <select id="sort-order">
+                    <option value="DESC">По убыванию</option>
+                    <option value="ASC">По возрастанию</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="filter-buttons">
+            <button id="apply-filters" class="btn-primary">Применить</button>
+            <button id="reset-filters" class="btn-secondary">Сбросить</button>
+        </div>
+    </div>
+</div>
+
+<script>
+
+    const cameraCheckboxes = document.querySelectorAll('#camera-dropdown input');
+    const violationCheckboxes = document.querySelectorAll('#violation-dropdown input');
+    const dateFrom = document.getElementById('date-from');
+    const dateTo = document.getElementById('date-to');
+    const timeFrom = document.getElementById('time-from');
+    const timeTo = document.getElementById('time-to');
+    const probMin = document.getElementById('prob-min');
+    const probMax = document.getElementById('prob-max');
+    const probMinValue = document.getElementById('prob-min-value');
+    const probMaxValue = document.getElementById('prob-max-value');
+    const sortField = document.getElementById('sort-field');
+    const sortOrder = document.getElementById('sort-order');
+    const applyBtn = document.getElementById('apply-filters');
+    const resetBtn = document.getElementById('reset-filters');
+    const perPage = document.getElementById('per-page');
+    const prevBtn = document.getElementById('prev-page');
+    const nextBtn = document.getElementById('next-page');
+    const pageInfo = document.getElementById('page-info');
+    const refreshBtn = document.getElementById('refresh-btn');
+
+
+    let currentPage = 1;
+    let totalPages = 1;
+    let allRows = [];
+
+    function updateProbLabels() {
+        probMinValue.textContent = probMin.value;
+        probMaxValue.textContent = probMax.value;
+        if (parseInt(probMin.value) > parseInt(probMax.value)) {
+            probMin.value = probMax.value;
+            probMinValue.textContent = probMax.value;
+        }
+    }
+    probMin.addEventListener('input', updateProbLabels);
+    probMax.addEventListener('input', updateProbLabels);
+
+    function applyFilters() {
+        const selectedCameras = Array.from(cameraCheckboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+
+        const selectedViolations = Array.from(violationCheckboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+
+        const dateFromVal = dateFrom.value;
+        const dateToVal = dateTo.value;
+        const timeFromVal = timeFrom.value;
+        const timeToVal = timeTo.value;
+        const probMinVal = parseInt(probMin.value) / 100;
+        const probMaxVal = parseInt(probMax.value) / 100;
+        const sortFieldVal = sortField.value;
+        const sortOrderVal = sortOrder.value;
+
+        const rows = Array.from(document.querySelectorAll('#violations-tbody tr'));
+
+        let filteredRows = rows.filter(row => {
+            const camera = row.dataset.camera;
+            const type = row.dataset.type;
+            const date = row.cells[0].textContent;
+            const time = row.cells[1].textContent;
+            const probText = row.cells[4].textContent;
+            const prob = parseInt(probText) / 100;
+
+            if (selectedCameras.length > 0 && !selectedCameras.includes(camera)) return false;
+            if (selectedViolations.length > 0 && !selectedViolations.includes(type)) return false;
+            if (dateFromVal && date < dateFromVal) return false;
+            if (dateToVal && date > dateToVal) return false;
+            if (timeFromVal && time < timeFromVal) return false;
+            if (timeToVal && time > timeToVal) return false;
+            if (prob < probMinVal || prob > probMaxVal) return false;
+            return true;
+        });
+
+        filteredRows.sort((a, b) => {
+            let aVal, bVal;
+            switch(sortFieldVal) {
+                case 'date':
+                    aVal = a.cells[0].textContent;
+                    bVal = b.cells[0].textContent;
+                    break;
+                case 'time':
+                    aVal = a.cells[1].textContent;
+                    bVal = b.cells[1].textContent;
+                    break;
+                case 'confidence':
+                    aVal = parseInt(a.cells[4].textContent);
+                    bVal = parseInt(b.cells[4].textContent);
+                    break;
+                default:
+                    aVal = a.cells[0].textContent;
+                    bVal = b.cells[0].textContent;
+            }
+            if (sortOrderVal === 'ASC') {
+                return aVal > bVal ? 1 : -1;
+            } else {
+                return aVal < bVal ? 1 : -1;
+            }
+        });
+
+        allRows = filteredRows;
+        totalPages = Math.ceil(allRows.length / parseInt(perPage.value));
+        currentPage = 1;
+        updatePagination();
+        renderPage();
+    }
+
+    function renderPage() {
+        const perPageVal = parseInt(perPage.value);
+        const start = (currentPage - 1) * perPageVal;
+        const end = start + perPageVal;
+        const pageRows = allRows.slice(start, end);
+
+        const tbody = document.getElementById('violations-tbody');
+        tbody.innerHTML = '';
+        pageRows.forEach(row => {
+            tbody.appendChild(row.cloneNode(true));
+        });
+    }
+
+    function updatePagination() {
+        pageInfo.textContent = `${currentPage} из ${totalPages}`;
+        prevBtn.disabled = currentPage <= 1;
+        nextBtn.disabled = currentPage >= totalPages;
+    }
+
+    function resetFilters() {
+        cameraCheckboxes.forEach(cb => cb.checked = true);
+        violationCheckboxes.forEach(cb => cb.checked = true);
+
+        const today = new Date();
+        const monthAgo = new Date();
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        dateFrom.value = monthAgo.toISOString().split('T')[0];
+        dateTo.value = today.toISOString().split('T')[0];
+        timeFrom.value = '00:00';
+        timeTo.value = '23:59';
+        probMin.value = '0';
+        probMax.value = '100';
+        sortField.value = 'date';
+        sortOrder.value = 'DESC';
+
+        updateProbLabels();
+        applyFilters();
+    }
+
+    function loadFromServer() {
+        window.location.reload();
+    }
+
+    applyBtn.addEventListener('click', applyFilters);
+    resetBtn.addEventListener('click', resetFilters);
+    refreshBtn.addEventListener('click', loadFromServer);
+
+
+    prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            renderPage();
+            updatePagination();
+        }
+    });
+
+    nextBtn.addEventListener('click', () => {
+        if (currentPage < totalPages) {
+            currentPage++;
+            renderPage();
+            updatePagination();
+        }
+    });
+
+    perPage.addEventListener('change', () => {
+        currentPage = 1;
+        totalPages = Math.ceil(allRows.length / parseInt(perPage.value));
+        updatePagination();
+        renderPage();
+    });
+
+    const toggleBtn = document.getElementById('toggle-panel-btn');
+    const rightPanel = document.getElementById('right-panel');
+    const tableWrapper = document.getElementById('table-wrapper');
+
+    let isPanelVisible = true;
+
+    toggleBtn.addEventListener('click', () => {
+        if (isPanelVisible) {
+            rightPanel.classList.add('hidden');
+            tableWrapper.classList.add('expanded');
+            isPanelVisible = false;
+        } else {
+            rightPanel.classList.remove('hidden');
+            tableWrapper.classList.remove('expanded');
+            isPanelVisible = true;
+        }
+    });
+    const cameraDropdownBtn = document.getElementById('camera-dropdown-btn');
+    const cameraDropdown = document.getElementById('camera-dropdown');
+    const cameraArrow = cameraDropdownBtn?.querySelector('.arrow');
+
+    cameraDropdownBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cameraDropdown.classList.toggle('show');
+        cameraArrow?.classList.toggle('rotated');
+    });
+
+    const violationDropdownBtn = document.getElementById('violation-dropdown-btn');
+    const violationDropdown = document.getElementById('violation-dropdown');
+    const violationArrow = violationDropdownBtn?.querySelector('.arrow');
+
+    violationDropdownBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        violationDropdown.classList.toggle('show');
+        violationArrow?.classList.toggle('rotated');
+    });
+
+    document.addEventListener('click', () => {
+        cameraDropdown?.classList.remove('show');
+        cameraArrow?.classList.remove('rotated');
+        violationDropdown?.classList.remove('show');
+        violationArrow?.classList.remove('rotated');
+    });
+
+    resetFilters();
+</script>
+{% endblock %}
