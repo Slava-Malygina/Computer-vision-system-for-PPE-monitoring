@@ -15,6 +15,7 @@ from modules.UI.gradient_outline_button import GradientOutlineButton
 from modules.UI.pagination_panel import PaginationPanel
 from modules.database.sqlite_logger import SQLiteLogger
 from modules.utils.export_log import export_to_pdf, export_to_csv, export_to_xlsx
+from modules.utils.screenshot_viewer import ScreenshotViewer
 from modules.utils.style_loader import StyleLoader
 
 VIOLATION_MAP = {
@@ -74,7 +75,8 @@ class ViolationLogsTab(QWidget):
         self.table.setHorizontalHeaderLabels([
             "Дата", "Время", "ID нарушителя", "Тип нарушения", "Вероятность", "ID камеры", "Путь к скриншоту"
         ])
-
+        self.table.setItemDelegate(PaddingDelegate(left=8))
+        self.table.cellDoubleClicked.connect(self.on_cell_double_clicked)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setAlternatingRowColors(True)
         stylesheet = StyleLoader.load_stylesheet("table_style.qss")
@@ -360,6 +362,16 @@ class ViolationLogsTab(QWidget):
 
     def on_switch_btn_click(self):
         self.main_window.setCurrentIndex(0)
+
+    def open_screenshot(self, screenshot_path):
+        viewer = ScreenshotViewer(screenshot_path, self)
+        viewer.exec_()
+
+    def on_cell_double_clicked(self, row, column):
+        if column == 6:
+            item = self.table.item(row, column)
+            if item and item.text():
+                self.open_screenshot(item.text())
 
 class PaddingDelegate(QStyledItemDelegate):
     def __init__(self, left=8, parent=None):

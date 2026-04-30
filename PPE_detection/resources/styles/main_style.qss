@@ -20,7 +20,7 @@ QTabWidget {
     background-color: transparent;
     border: none;
 }
-QTabWidget::pane {
+QTabWidget::pane, #screenshotViewer {
     background-color: qlineargradient(
     x1: 0.4, y1: 0.2, x2: 0.6, y2: 1,
     stop: 0 #3F3864,

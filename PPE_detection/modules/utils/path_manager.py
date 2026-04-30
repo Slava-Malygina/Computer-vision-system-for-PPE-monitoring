@@ -69,10 +69,8 @@ class PathManager:
         filename = f"frame_{frame_id:06d}_{timestamp}.jpg"
         return str(screenshot_dir / filename)
 
-
     def get_model_path(self, model_name="best_12.pt"):
         return os.path.join(self.models_dir, model_name)
-
 
     def get_icon_path(self, icon_name):
         return str(self.resources_dir / "icons" / icon_name)

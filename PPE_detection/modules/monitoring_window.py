@@ -28,6 +28,7 @@ from modules.violation_detector import ViolationDetector
 from modules.utils.screenshot_saver import save_violation_screenshot
 from modules.utils.cleanup_manager import cleanup_manager
 
+
 class MonitoringTab(QWidget):
 
     def __init__(self, logger, main_window):
