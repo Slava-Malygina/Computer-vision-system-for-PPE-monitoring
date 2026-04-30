@@ -664,9 +664,11 @@ class MonitoringTab(QWidget):
 
         last_detections = self.camera_last_detections.get(camera_index)
         last_tracks = self.camera_last_tracks.get(camera_index)
+        last_violations = self.camera_last_violations.get(camera_index, {})
         if last_detections is not None:
             display_frame = frame.copy()
-            display_frame = draw_detections_on_frame_with_tracking(display_frame, last_detections, last_tracks, {})
+            display_frame = draw_detections_on_frame_with_tracking(display_frame, last_detections, last_tracks,
+                                                                   last_violations)
         else:
             display_frame = frame
         self.ui_handler.update_frame(camera_index, display_frame)
@@ -704,8 +706,6 @@ class MonitoringTab(QWidget):
             self.camera_last_detections[camera_index] = detections
 
             display_frame = frame.copy()
-            draw_detections_on_frame(display_frame, detections)
-            self.ui_handler.update_frame(camera_index, display_frame)
 
             if self.fullscreen_mode and camera_index == self.fullscreen_camera_index:
                 self.display_single_frame(display_frame)
@@ -719,6 +719,17 @@ class MonitoringTab(QWidget):
             self.camera_last_tracks[camera_index] = tracks
             result = self.violation_detector.process_frame(detections, tracks, frame_counter)
 
+            self.camera_last_violations[camera_index] = result['violations_dict']
+
+            last_frame = self.camera_original_frames.get(camera_index)
+            if last_frame is not None:
+                display_frame = draw_detections_on_frame_with_tracking(
+                    last_frame.copy(),
+                    detections,
+                    tracks,
+                    result['violations_dict']
+                )
+                self.ui_handler.update_frame(camera_index, display_frame)
 
             screenshot_path = None
             if result['violations_dict']:
@@ -726,8 +737,6 @@ class MonitoringTab(QWidget):
                     frame, detections, tracks, result['violations_dict'],
                     frame_counter, source_id
                 )
-            display_frame = draw_detections_on_frame_with_tracking(display_frame, detections, tracks, result)
-            self.ui_handler.update_frame(camera_index, display_frame)
             for human_id, human_violations in result['violations_dict'].items():
                 for violation in human_violations:
                     self.ui_handler.add_violation({

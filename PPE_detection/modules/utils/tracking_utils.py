@@ -199,9 +199,9 @@ def draw_detections_on_frame_with_tracking(frame, detections, tracks, violations
             if any(v['violation_type'] == 'no_helmet' for v in violations_list):
                 track_color = (0, 0, 255)
             elif any(v['violation_type'] == 'no_vest' for v in violations_list):
-                track_color = (0, 165, 255)
+                track_color = (0, 0, 255)
             elif any(v['violation_type'] == 'no_gloves' for v in violations_list):
-                track_color = (255, 0, 0)
+                track_color = (0, 0, 255)
 
         cv2.rectangle(display_frame, (x1, y1), (x2, y2), track_color, 2)
 
