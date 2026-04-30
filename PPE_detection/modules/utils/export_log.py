@@ -12,10 +12,13 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
+from modules.utils.path_manager import path_manager
+
+
 def export_to_pdf(data, file_path):
     font_name = "DejaVuSerif"
     try:
-        font_path = os.path.join(os.path.dirname(__file__), 'fonts', 'DejaVuSerif.ttf')
+        font_path = path_manager.get_font_path('DejaVuSerif.ttf')
         if os.path.exists(font_path):
             pdfmetrics.registerFont(TTFont(font_name, font_path))
     except:

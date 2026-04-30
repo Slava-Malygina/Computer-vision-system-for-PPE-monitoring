@@ -1,5 +1,7 @@
 import os
 
+from modules.utils.path_manager import path_manager
+
 
 class ModelLoader:
     def __init__(self):
@@ -8,17 +10,14 @@ class ModelLoader:
 
     @staticmethod
     def get_model_path():
-        base = os.path.dirname(__file__)
+
         # Последняя версия модели - визуально показывает лучшие результаты,
         # в папке model - есть последние 5 версии, best - одна из них
-        possible_paths = [
-            os.path.join(base, "..", "model", "best_12.pt"),
-        ]
 
-        for path in possible_paths:
-            if os.path.exists(path):
-                print(path)
-                return path
+        path = path_manager.get_model_path("best_12.pt")
+        if os.path.exists(path):
+            print(path)
+            return path
 
         return None
 

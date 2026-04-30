@@ -2,7 +2,7 @@ import os
 import yaml
 from typing import Dict, List
 from PyQt5.QtCore import QObject, pyqtSignal
-
+from modules.utils.path_manager import path_manager
 DEFAULT_THRESHOLDS = {
     'head': 0.6,
     'helmet': 0.5,
@@ -16,16 +16,9 @@ DEFAULT_THRESHOLDS = {
 class ThresholdManager(QObject):
     thresholds_updated = pyqtSignal(str, dict)
 
-    def __init__(self, config_path: str = None):
+    def __init__(self):
         super().__init__()
-        if config_path is None:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            # project_root = os.path.dirname(current_dir)
-            project_root = os.path.dirname(os.path.dirname(current_dir))
-            # self.config_path = os.path.join(project_root, 'config', 'config.yaml')
-            self.config_path = os.path.join(project_root, 'config', 'config.yaml')
-        else:
-            self.config_path = config_path
+        self.config_path = path_manager.get_config_path()
         self._thresholds_by_rtsp: Dict[str, Dict[str, float]] = {}
         self.load_config()
 

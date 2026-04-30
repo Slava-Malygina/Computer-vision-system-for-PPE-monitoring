@@ -1,21 +1,22 @@
 import sqlite3
 import logging
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from threading import Lock
+from modules.utils.path_manager import path_manager
+
 
 class SQLiteLogger:
 
     VALID_VIOLATION_TYPES = {'no_helmet', 'no_vest', 'no_gloves'}
 
     def __init__(self,
-                 db_path: str = '/log/violations.db',
-                 screenshots_dir: str = '../../violations',
+                 db_path: str = None,
+                 screenshots_dir: str = None,
                  max_buffer_size: int = 20):
 
-        self.db_path = db_path
-        self.screenshots_dir = screenshots_dir
+        self.db_path = db_path or path_manager.get_db_path()
+        self.screenshots_dir = screenshots_dir or path_manager.get_violations_dir()
         self.max_buffer_size = max_buffer_size
 
         self.lock = Lock()
@@ -95,7 +96,7 @@ class SQLiteLogger:
         now = datetime.now()
 
         if screenshot_path is None:
-            screenshot_path = f"{self.screenshots_dir}/{camera_id}_{frame_id}_{int(time.time() * 1000)}.jpg"
+            screenshot_path = path_manager.get_violation_path(camera_id, frame_id)
 
         record = (
             now.strftime('%Y-%m-%d'),

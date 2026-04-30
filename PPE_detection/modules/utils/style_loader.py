@@ -1,23 +1,14 @@
 import os
 
+from modules.utils.path_manager import path_manager
+
+
 class StyleLoader:
     @staticmethod
     def load_stylesheet(qss_file_name):
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        root = current_dir
-        while root:
-            if os.path.exists(os.path.join(root, 'resources', 'styles')):
-                break
-            parent = os.path.dirname(root)
-            if parent == root:
-                root = None
-                break
-            root = parent
+        styles_dir = path_manager.get_styles_dir()
 
-        if root is None:
-            root = os.path.dirname(os.path.dirname(current_dir))
-
-        qss_path = os.path.join(root, 'resources', 'styles', qss_file_name)
+        qss_path = os.path.join(styles_dir, qss_file_name)
         if not os.path.exists(qss_path):
             raise FileNotFoundError(f"Style file not found: {qss_path}")
 

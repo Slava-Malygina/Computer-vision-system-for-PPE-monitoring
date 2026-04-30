@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
 )
 
 from modules.UI.detection_threshold_dialog import DetectionThresholdsDialog
+from modules.utils.path_manager import path_manager
 from modules.utils.style_loader import StyleLoader
 from modules.utils.threshold_manager import ThresholdManager
 
@@ -58,8 +59,7 @@ class RtspConfigDialog(QDialog):
         for i in range(self.MAX_SOURCES):
             label = QLabel(f"Камера {i + 1}:")
             label.setMinimumWidth(70)
-            base_path = os.path.dirname(os.path.abspath(__file__))
-            icon_path = os.path.normpath(os.path.join(base_path, "..", "icons", "ic_settings.png"))
+            icon_path = os.path.join(path_manager.get_icons_dir(), "ic_settings.png")
             settings_btn = QToolButton()
             settings_btn.setIcon(QIcon(icon_path))
             settings_btn.setFixedSize(26, 26)
