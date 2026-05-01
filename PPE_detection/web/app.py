@@ -1,24 +1,87 @@
-from flask import Flask, render_template
-from database_stub import DatabaseStub
+import sys
+from pathlib import Path
 
-app = Flask(__name__,
-            template_folder='templates',
-            static_folder='static')
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-db = DatabaseStub()  #Заглушка
+from flask import Flask, request, render_template, url_for, redirect
+from database.sqlite_logger import SQLiteLogger
 
-violations = db.get_violations(limit=100)
+DB_PATH = Path(__file__).parent.parent / "logs" / "violations.db"
+app = Flask(__name__)
+logger = SQLiteLogger(db_path=str(DB_PATH))
 
+def get_unique_camera_ids():
+    conn = logger.connection
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT camera_id FROM violations ORDER BY camera_id")
+    return [row[0] for row in cursor.fetchall()]
 
-@app.route('/analytics')
-def analytics():
-    return render_template('analytics.html', active_tab='analytics')
+def get_filter_params_from_request():
+    cameras = request.args.getlist('camera_id')
+    types = request.args.getlist('violation_type')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    time_from = request.args.get('time_from', '')
+    time_to = request.args.get('time_to', '')
+    min_conf = request.args.get('min_confidence', type=float)
+    max_conf = request.args.get('max_confidence', type=float)
+    sort_by = request.args.get('sort_by', 'date')
+    sort_order = request.args.get('sort_order', 'DESC')
 
+    if min_conf is not None:
+        min_conf = min_conf / 100.0
+    if max_conf is not None:
+        max_conf = max_conf / 100.0
+
+    return {
+        'camera_id': cameras if cameras else None,
+        'violation_type': types if types else None,
+        'start_date': date_from if date_from else None,
+        'end_date': date_to if date_to else None,
+        'start_time': time_from if time_from else None,
+        'end_time': time_to if time_to else None,
+        'min_confidence': min_conf,
+        'max_confidence': max_conf,
+        'sort_by': sort_by,
+        'sort_order': sort_order
+    }
+
+@app.route('/')
+def index():
+    return redirect(url_for('journal'))
 
 @app.route('/journal')
 def journal():
-    return render_template('journal.html', violations=violations, active_tab='journal')
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 25, type=int)
+    if per_page not in (10, 25, 50, 100):
+        per_page = 25
+    offset = (page - 1) * per_page
 
+    filters = get_filter_params_from_request()
+
+    violations = logger.get_violations(
+        limit=per_page,
+        offset=offset,
+        **filters
+    )
+
+    count_filters = {k: v for k, v in filters.items() if k not in ('sort_by', 'sort_order')}
+    total = logger.get_violations_count(**count_filters)
+
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+    all_cameras = get_unique_camera_ids()
+
+    return render_template(
+        'journal.html',
+        violations=violations,
+        total=total,
+        page=page,
+        per_page=per_page,
+        total_pages=total_pages,
+        all_cameras=all_cameras,
+        filters=filters
+    )
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
