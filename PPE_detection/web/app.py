@@ -4,7 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from flask import Flask, request, render_template, url_for, redirect
-from database.sqlite_logger import SQLiteLogger
+from modules.database.sqlite_logger import SQLiteLogger
 
 DB_PATH = Path(__file__).parent.parent / "logs" / "violations.db"
 app = Flask(__name__)
@@ -66,11 +66,45 @@ def journal():
         **filters
     )
 
+
     count_filters = {k: v for k, v in filters.items() if k not in ('sort_by', 'sort_order')}
     total = logger.get_violations_count(**count_filters)
 
     total_pages = (total + per_page - 1) // per_page if total > 0 else 1
     all_cameras = get_unique_camera_ids()
+
+    print("\n" + "=" * 50)
+    print("СТАТИСТИКА ПО БД:")
+
+    # Проверяем все уникальные типы нарушений
+    conn = logger.connection
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT DISTINCT violation_type, COUNT(*) as cnt FROM violations GROUP BY violation_type")
+    types_stats = cursor.fetchall()
+    for row in types_stats:
+        print(f"  {row['violation_type']}: {row['cnt']} записей")
+
+    # Проверяем записи за 30 апреля
+    cursor.execute("SELECT date, violation_type, camera_id FROM violations WHERE date = '2026-04-30' LIMIT 20")
+    april_30 = cursor.fetchall()
+    print(f"\nЗаписи за 2026-04-30 (первые 20):")
+    for row in april_30:
+        print(f"  {row['date']} | {row['violation_type']} | {row['camera_id']}")
+
+    # Проверяем, есть ли no_helmet в принципе
+    cursor.execute("SELECT COUNT(*) as cnt FROM violations WHERE violation_type = 'no_helmet'")
+    no_helmet_count = cursor.fetchone()['cnt']
+    print(f"\nВсего записей с no_helmet: {no_helmet_count}")
+
+    if no_helmet_count > 0:
+        cursor.execute("SELECT date, time, camera_id FROM violations WHERE violation_type = 'no_helmet' LIMIT 5")
+        samples = cursor.fetchall()
+        print("Примеры записей с no_helmet:")
+        for row in samples:
+            print(f"  {row['date']} {row['time']} | {row['camera_id']}")
+
+    print("=" * 50 + "\n")
 
     return render_template(
         'journal.html',

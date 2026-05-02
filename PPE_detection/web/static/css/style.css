@@ -54,7 +54,8 @@ body {
 
 
 .table-wrapper {
-    flex: 5;
+    flex: 1;
+    min-width: 0;
     background: transparent;
     border-radius: 15px;
     padding-left: 30px;
@@ -65,7 +66,7 @@ body {
 }
 
 .right-panel {
-    flex: 2;
+    flex: 0 0 25%;
     background: rgba(50, 48, 85, 0.8);
     border-radius: 15px 0 0 15px;
     padding: 20px;
@@ -135,6 +136,37 @@ body {
     cursor: pointer;
     transition: all 0.3s ease;
     font-weight: bold;
+}
+
+.pagination-controls a {
+    background: rgba(50, 48, 85, 0.8);
+    border: 1px solid #2a68ff;
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.pagination-controls a:hover {
+    background: #282650;
+    border-color: #7DCFFF;
+    transform: scale(1.05);
+}
+
+.pagination-controls button:hover {
+    background: #282650;
+    border-color: #7DCFFF;
+    transform: scale(1.05);
+}
+
+.pagination-controls button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
 }
 
 .pagination-controls button:hover {
@@ -605,4 +637,6 @@ input[type="radio"] {
         min-width: 100px;
         padding: 8px 16px;
     }
+
+
 }
