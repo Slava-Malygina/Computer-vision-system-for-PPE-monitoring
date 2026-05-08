@@ -1,10 +1,14 @@
 import os
 
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QColor, QPainter, QFontMetrics
 from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout,
                              QWidget, QTableWidget, QHeaderView, QTableWidgetItem, QPushButton, QLabel, QComboBox,
-                             QSizePolicy)
+                             QSizePolicy, QStyle)
 from PyQt5.QtWidgets import QFileDialog
+
+
+from PyQt5.QtCore import QRect
+from PyQt5.QtGui import QTextDocument
 
 
 from PyQt5.QtWidgets import QStyledItemDelegate
@@ -75,10 +79,11 @@ class ViolationLogsTab(QWidget):
         self.table.setHorizontalHeaderLabels([
             "Дата", "Время", "ID нарушителя", "Тип нарушения", "Вероятность", "ID камеры", "Путь к скриншоту"
         ])
+        self.table.setItemDelegateForColumn(6, MultiLineDelegate(self.table))
         self.table.setItemDelegate(PaddingDelegate(left=8))
         self.table.cellDoubleClicked.connect(self.on_cell_double_clicked)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.table.setAlternatingRowColors(True)
+        self.table.setAlternatingRowColors(False)
         stylesheet = StyleLoader.load_stylesheet("table_style.qss")
         self.table.setStyleSheet(stylesheet)
         self.table.verticalHeader().setVisible(False)
@@ -86,6 +91,16 @@ class ViolationLogsTab(QWidget):
         self.filter_panel.downloadRequested.connect(self.download_report)
         self.filter_panel.apply_btn.clicked.connect(self.apply_filters)
         self.filter_panel.reset_btn.clicked.connect(self.reset_filters)
+
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(6, QHeaderView.Stretch)
+
+
 
         per_page_layout = QHBoxLayout()
         per_page_layout.setAlignment(Qt.AlignRight)
@@ -276,7 +291,9 @@ class ViolationLogsTab(QWidget):
 
     def _update_table(self, data):
         self.table.setRowCount(len(data))
-
+        self.table.setWordWrap(True)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         for row_idx, row in enumerate(data):
             self.table.setItem(row_idx, 0, QTableWidgetItem(str(row.get("date", ""))))
             self.table.setItem(row_idx, 1, QTableWidgetItem(str(row.get("time", ""))))
@@ -293,6 +310,8 @@ class ViolationLogsTab(QWidget):
             self.table.setItem(row_idx, 5, QTableWidgetItem(str(row.get("camera_id", ""))))
             self.table.setItem(row_idx, 6, QTableWidgetItem(str(row.get("screenshot_path", ""))))
 
+            self.table.resizeRowsToContents()
+            self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
     def _update_pagination(self, per_page):
         total_pages = max(1, (self.total_records + per_page - 1) // per_page)
         self.pagination.pageChanged.disconnect()
@@ -382,3 +401,57 @@ class PaddingDelegate(QStyledItemDelegate):
         super().initStyleOption(option, index)
         option.displayAlignment = Qt.AlignVCenter | Qt.AlignLeft
         option.text = " " * (self.left // 2) + (option.text or "")
+
+
+class MultiLineDelegate(QStyledItemDelegate):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def paint(self, painter, option, index):
+        text = index.data(Qt.DisplayRole)
+        if not text:
+            return
+
+        painter.save()
+
+        if option.state & QStyle.State_Selected:
+            painter.fillRect(option.rect, option.palette.highlight())
+        else:
+            painter.fillRect(option.rect, QColor(50, 48, 85))
+
+        rect = QRect(option.rect)
+        rect.setLeft(rect.left() + 5)
+        rect.setRight(rect.right() - 5)
+        rect.setBottom(rect.bottom() + 5)
+
+        html = f'<html><head><style>body {{ color: white; font-weight: bold; font-family: "{painter.font().family()}"; font-size: {painter.font().pointSize()}pt; }}</style></head><body>{text}</body></html>'
+
+        doc = QTextDocument()
+        doc.setHtml(html)
+        doc.setTextWidth(rect.width())
+
+        painter.translate(rect.topLeft())
+        doc.drawContents(painter)
+
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        text = index.data(Qt.DisplayRole)
+        if not text:
+            return QSize(option.rect.width(), 35)
+
+        rect = QRect(option.rect)
+        rect.setLeft(rect.left() + 5)
+        rect.setRight(rect.right() - 5)
+
+        html = f'<html><head><style>body {{ color: white; font-weight: bold; }}</style></head><body>{text}</body></html>'
+
+        doc = QTextDocument()
+        doc.setHtml(html)
+        doc.setTextWidth(rect.width())
+        height = doc.size().height() + 15
+
+        return QSize(rect.width(), max(int(height), 35))
+
+    def createEditor(self, parent, option, index):
+        return None
