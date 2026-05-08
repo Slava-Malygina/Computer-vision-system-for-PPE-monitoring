@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="analytics-container">
+    <div class="filters-bar">
+        <form id="analytics-filters" method="get" action="{{ url_for('analytics') }}">
+            <div class="filter-group">
+                <label>Камеры:</label>
+                <select name="camera_id" multiple>
+                    {% for cam in all_cameras %}
+                    <option value="{{ cam }}">{{ cam }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Дата с:</label>
+                <input type="date" name="start_date" id="start_date" value="{{ start_date or '' }}">
+                <label>по:</label>
+                <input type="date" name="end_date" id="end_date" value="{{ end_date or '' }}">
+            </div>
+            <div class="filter-group">
+                <label>Типы нарушений:</label>
+                <select name="violation_type" multiple>
+                    <option value="no_helmet">Без каски</option>
+                    <option value="no_vest">Без жилета</option>
+                    <option value="no_gloves">Без перчаток</option>
+                </select>
+            </div>
+            <div class="filter-actions">
+                <button type="submit">Применить фильтры</button>
+                <button type="reset" id="reset-analytics">Сбросить</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="charts-row">
+        <div class="chart-card">
+            <h3>Распределение нарушений по типам</h3>
+            <canvas id="chart-types" width="400" height="400"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>Динамика нарушений по дням</h3>
+            <canvas id="chart-daily" width="800" height="400"></canvas>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let start_date = urlParams.get('start_date');
+        let end_date = urlParams.get('end_date');
+        const today = new Date();
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(today.getDate() - 7);
+
+        if (!start_date) {
+            start_date = sevenDaysAgo.toISOString().split('T')[0];
+            document.getElementById('start_date').value = start_date;
+        }
+        if (!end_date) {
+            end_date = today.toISOString().split('T')[0];
+            document.getElementById('end_date').value = end_date;
+        }
+
+        const camera_ids = urlParams.getAll('camera_id');
+        const violation_types = urlParams.getAll('violation_type');
+
+        function buildApiUrl(baseUrl) {
+            let url = baseUrl;
+            const params = new URLSearchParams();
+            if (camera_ids.length) camera_ids.forEach(c => params.append('camera_id', c));
+            if (violation_types.length) violation_types.forEach(t => params.append('violation_type', t));
+            if (start_date) params.append('start_date', start_date);
+            if (end_date) params.append('end_date', end_date);
+            const query = params.toString();
+            if (query) url += '?' + query;
+            return url;
+        }
+
+        let typesChart, dailyChart;
+
+        async function loadCharts() {
+            try {
+                const typesResponse = await fetch(buildApiUrl('/api/stats/types'));
+                const typesData = await typesResponse.json();
+                const typesLabels = typesData.map(item => item.type);
+                const typesCounts = typesData.map(item => item.count);
+
+                if (typesChart) typesChart.destroy();
+                const ctxTypes = document.getElementById('chart-types').getContext('2d');
+                typesChart = new Chart(ctxTypes, {
+                    type: 'pie',
+                    data: {
+                        labels: typesLabels,
+                        datasets: [{
+                            data: typesCounts,
+                            backgroundColor: ['#ff6384', '#36a2eb', '#ffce56'],
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'bottom' },
+                            tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw} (${((ctx.raw / typesData.reduce((sum, i) => sum + i.count, 0)) * 100).toFixed(1)}%)` } }
+                        }
+                    }
+                });
+
+                const dailyResponse = await fetch(buildApiUrl('/api/stats/daily'));
+                const dailyData = await dailyResponse.json();
+                const dates = dailyData.map(item => item.date);
+                const counts = dailyData.map(item => item.count);
+
+                if (dailyChart) dailyChart.destroy();
+                const ctxDaily = document.getElementById('chart-daily').getContext('2d');
+                dailyChart = new Chart(ctxDaily, {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: [{
+                            label: 'Количество нарушений',
+                            data: counts,
+                            borderColor: '#3a7fff',
+                            backgroundColor: 'rgba(58, 127, 255, 0.1)',
+                            fill: true,
+                            tension: 0.1,
+                            pointBackgroundColor: '#3a7fff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        scales: { y: { beginAtZero: true, title: { display: true, text: 'Количество' } } }
+                    }
+                });
+            } catch (error) {
+                console.error('Ошибка загрузки диаграмм:', error);
+            }
+        }
+
+        const form = document.getElementById('analytics-filters');
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(form);
+            const params = new URLSearchParams();
+            for (let [key, value] of formData.entries()) {
+                if (value) params.append(key, value);
+            }
+            window.location.search = params.toString();
+        });
+
+        document.getElementById('reset-analytics').addEventListener('click', function(e) {
+            e.preventDefault();
+            window.location.href = window.location.pathname;
+        });
+
+        loadCharts();
+    });</script>
+{% endblock %}
