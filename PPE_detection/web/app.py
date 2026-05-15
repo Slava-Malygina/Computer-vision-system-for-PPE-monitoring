@@ -7,7 +7,7 @@ from flask import jsonify, request, send_from_directory
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from flask import Flask, request, render_template, url_for, redirect
-from database.sqlite_logger import SQLiteLogger
+from modules.database.sqlite_logger import SQLiteLogger
 
 DB_PATH = Path(__file__).parent.parent / "logs" / "violations.db"
 app = Flask(__name__)
