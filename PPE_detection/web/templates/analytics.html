@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/analytics_style.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="analytics-container">
+    <div class="glass-panel">
+        <div class="charts-section">
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>Распределение по типам нарушений</h3>
+                    <div class="chart-placeholder"></div>
+                </div>
+
+                <div class="chart-card">
+                    <h3>Динамика нарушений по дням</h3>
+                    <div class="chart-placeholder"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-spacer"></div>
+            <div class="filters-section">
+                <div class="filters-area" id="filters-area">
+                    <div class="filter-group filter-group-row">
+                        <label>Период:</label>
+                        <div class="period-buttons">
+                            <label class="radio-label">
+                                <input type="radio" name="period" value="7days"> 7 дней
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="period" value="30days"> 30 дней
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="period" value="3months"> 3 мес
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="period" value="year"> Год
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="period" value="custom" id="custom-period-radio"> Другое
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="filter-group filter-group-row" id="custom-date-range" style="display: none;">
+                        <label>Свой период:</label>
+                        <div class="date-range-wrapper">
+                            <input type="date" id="date-from" class="date-input">
+                            <span>—</span>
+                            <input type="date" id="date-to" class="date-input">
+                        </div>
+                    </div>
+                    <div class="filter-group camera-selector">
+                        <label>По камере:</label>
+                        <div class="dropdown-checkbox">
+                            <button type="button" class="dropdown-btn" id="camera-dropdown-btn">
+                                Выбрать камеры <span class="arrow">▼</span>
+                            </button>
+                            <div class="dropdown-content" id="camera-dropdown">
+                                <label><input type="checkbox" value="rtsp://localhost:8554/stream1" checked> rtsp://localhost:8554/stream1</label>
+                                <label><input type="checkbox" value="rtsp://localhost:8554/stream2" checked> rtsp://localhost:8554/stream2</label>
+                                <label><input type="checkbox" value="rtsp://localhost:8554/stream3" checked> rtsp://localhost:8554/stream3</label>
+                                <label><input type="checkbox" value="rtsp://localhost:8554/stream4" checked> rtsp://localhost:8554/stream4</label>
+
+                                <label><input type="checkbox" value="other" checked id="other-cameras-checkbox"> Другое (веб-камера, видео и т.д.)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="filter-buttons">
+                        <button id="apply-filters-analytics" class="btn-primary">Применить</button>
+                    </div>
+                </div>
+            </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+{% endblock %}
+
+

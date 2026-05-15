@@ -7,7 +7,8 @@ from flask import Flask, request, render_template, url_for, redirect
 from modules.database.sqlite_logger import SQLiteLogger
 
 DB_PATH = Path(__file__).parent.parent / "logs" / "violations.db"
-app = Flask(__name__)
+
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 logger = SQLiteLogger(db_path=str(DB_PATH))
 
 def get_unique_camera_ids():
@@ -50,6 +51,12 @@ def get_filter_params_from_request():
 def index():
     return redirect(url_for('journal'))
 
+@app.route('/analytics')
+def analytics():
+    return render_template(
+        'analytics.html',
+        active_tab='analytics'
+    )
 @app.route('/journal')
 def journal():
     page = request.args.get('page', 1, type=int)
@@ -114,7 +121,8 @@ def journal():
         per_page=per_page,
         total_pages=total_pages,
         all_cameras=all_cameras,
-        filters=filters
+        filters=filters,
+        active_tab='journal'
     )
 
 if __name__ == '__main__':

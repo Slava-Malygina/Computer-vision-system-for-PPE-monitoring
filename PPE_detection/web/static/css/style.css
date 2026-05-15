@@ -556,7 +556,6 @@ input[type="radio"] {
     border-bottom: 1px solid #2a2e35;
     padding-bottom: 10px;
 }
-
 .tab-btn {
     background: transparent;
     border: none;
@@ -565,18 +564,73 @@ input[type="radio"] {
     font-weight: bold;
     color: #8a94a6;
     cursor: pointer;
-    border-radius: 10px;
-    transition: all 0.3s ease;
+    border-radius: 12px;
+
+    transition:
+        transform 0.25s ease,
+        box-shadow 0.3s ease,
+        background 0.3s ease,
+        color 0.3s ease;
+
+    position: relative;
 }
+
 
 .tab-btn:hover {
     color: #ffffff;
     background: rgba(50, 48, 85, 0.5);
+
+    transform: translateY(-2px) scale(1.03);
+
+    box-shadow:
+        0 4px 12px rgba(124, 121, 252, 0.25);
 }
 
+
 .tab-btn.active {
-    background: linear-gradient(135deg, #E677FF, #7C79FC, #7DCFFF);
+    background: linear-gradient(
+        135deg,
+        #E677FF,
+        #7C79FC,
+        #7DCFFF
+    );
+
     color: #ffffff;
+
+    transform: translateY(-2px) scale(1.05);
+
+    box-shadow:
+        0 0 12px rgba(230, 119, 255, 0.45),
+        0 0 22px rgba(125, 207, 255, 0.35);
+
+    animation: activeTabPulse 2s infinite ease-in-out;
+}
+
+
+@keyframes activeTabPulse {
+    0% {
+        box-shadow:
+            0 0 12px rgba(230, 119, 255, 0.35),
+            0 0 22px rgba(125, 207, 255, 0.25);
+
+        transform: translateY(-2px) scale(1.05);
+    }
+
+    50% {
+        box-shadow:
+            0 0 18px rgba(230, 119, 255, 0.55),
+            0 0 28px rgba(125, 207, 255, 0.45);
+
+        transform: translateY(-3px) scale(1.07);
+    }
+
+    100% {
+        box-shadow:
+            0 0 12px rgba(230, 119, 255, 0.35),
+            0 0 22px rgba(125, 207, 255, 0.25);
+
+        transform: translateY(-2px) scale(1.05);
+    }
 }
 .right-panel.hidden {
     display: none;
@@ -639,4 +693,92 @@ input[type="radio"] {
     }
 
 
+}
+
+body, html {
+    height: auto !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    min-height: 100vh !important;
+}
+
+body {
+    overflow-y: auto !important;
+    height: auto !important;
+}
+
+.container {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-y: visible !important;
+    overflow-x: visible !important;
+    padding-bottom: 20px;
+}
+
+.analytics-container {
+    overflow-y: visible !important;
+    min-height: auto !important;
+}
+
+body::-webkit-scrollbar,
+html::-webkit-scrollbar {
+    width: 6px;
+}
+
+body::-webkit-scrollbar-track,
+html::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0);
+    border-radius: 3px;
+}
+
+body::-webkit-scrollbar-thumb,
+html::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #E677FF, #7C79FC, #7DCFFF);
+    border-radius: 3px;
+}
+
+body::-webkit-scrollbar-thumb:hover,
+html::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #7DCFFF, #7C79FC, #E677FF);
+}
+
+
+.container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0);
+    border-radius: 3px;
+}
+
+.container::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #E677FF, #7C79FC, #7DCFFF);
+    border-radius: 3px;
+}
+
+.container::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #7DCFFF, #7C79FC, #E677FF);
+}
+
+.period-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    color: white;
+    font-size: 14px;
+}
+
+.radio-label input[type="radio"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #7DCFFF;
+    cursor: pointer;
 }
