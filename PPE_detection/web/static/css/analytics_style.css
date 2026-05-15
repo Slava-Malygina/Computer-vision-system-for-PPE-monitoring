@@ -11,7 +11,9 @@
     align-items: flex-start;
 }
 
-
+.glass-panel {
+    margin: auto;
+}
 ::-webkit-scrollbar {
     width: 6px;
 }
@@ -117,28 +119,53 @@ html, body {
 
     pointer-events: none;
 }
-
 .date-input {
-    background: rgba(50, 48, 85, 0.8);
-    border: 1px solid #2a68ff;
-    border-radius: 8px;
-    padding: 10px 12px;
-    color: #ffffff;
+    width: 160px;
+
+    padding: 10px 14px;
+    border-radius: 14px !important;
+
+
     font-size: 14px;
+
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+
     cursor: pointer;
-    transition: all 0.3s ease;
+
+    transition: 0.25s ease;
+
+    outline: none;
 }
 
 .date-input:hover {
+    background: rgba(20, 20, 40, 0.55) !important;
+    border-color: rgba(125, 207, 255, 0.5);
+    box-shadow: 0 0 18px rgba(125, 207, 255, 0.12);
+    transform: translateY(-1px);
+}
+
+.date-input:focus {
     border-color: #7DCFFF;
-     background: rgba(163, 2, 181, 1) !important;
+    box-shadow: 0 0 0 2px rgba(125, 207, 255, 0.25);
 }
 
 .date-range-wrapper span {
     color: #ffffff;
     font-weight: bold;
 }
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.85;
+    cursor: pointer;
+}
 
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
 .date-range-wrapper {
     display: flex;
     align-items: center;
@@ -399,6 +426,13 @@ html, body {
     font-size: 18px;
 }
 
+
+.chart-card canvas {
+    flex: 1;
+    display: block;
+    margin: auto;
+}
+
 .chart-placeholder {
     width: 100%;
 
@@ -428,7 +462,7 @@ html, body {
 }
 
 .filter-group label {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     color: #d7d7ff;
     letter-spacing: 0.3px;
@@ -604,4 +638,26 @@ html, body {
     backdrop-filter: blur(10px);
 
     letter-spacing: 0.3px;
+}
+
+
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.8;
+    cursor: pointer;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
+
+input[type="date"] {
+    color-scheme: dark;
+}
+.date-range-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: center;
 }

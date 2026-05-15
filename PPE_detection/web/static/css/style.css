@@ -783,19 +783,3 @@ html::-webkit-scrollbar-thumb:hover {
     cursor: pointer;
 }
 
-.chart-card canvas {
-    max-width: 100%;
-    height: auto;
-    max-height: 400px;
-}
-
-#chart-types {
-    max-width: 400px;
-    margin: 0 auto;
-}
-
-#chart-daily {
-    max-width: 800px;
-    margin: 0 auto;
-}
-

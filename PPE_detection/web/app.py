@@ -139,11 +139,6 @@ def stats_daily():
     result = [{'date': row['date'], 'count': row['count']} for row in rows]
     return jsonify(result)
 
-@app.route('/analytics')
-def analytics():
-    all_cameras = get_unique_camera_ids()
-    return render_template('analytics.html', all_cameras=all_cameras)
-
 def get_unique_camera_ids():
     conn = logger.connection
     cursor = conn.cursor()
