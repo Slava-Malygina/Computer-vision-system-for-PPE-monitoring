@@ -1,5 +1,8 @@
 import sys
 from pathlib import Path
+from collections import defaultdict
+from datetime import datetime, timedelta
+from flask import jsonify, request, send_from_directory
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -10,6 +13,136 @@ DB_PATH = Path(__file__).parent.parent / "logs" / "violations.db"
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 logger = SQLiteLogger(db_path=str(DB_PATH))
+
+def _apply_common_filters(query, params, filters):
+    if filters.get('camera_id'):
+        placeholders = ','.join(['?'] * len(filters['camera_id']))
+        query += f" AND camera_id IN ({placeholders})"
+        params.extend(filters['camera_id'])
+    
+    if filters.get('violation_type'):
+        placeholders = ','.join(['?'] * len(filters['violation_type']))
+        query += f" AND violation_type IN ({placeholders})"
+        params.extend(filters['violation_type'])
+    
+    if filters.get('start_date'):
+        query += " AND date >= ?"
+        params.append(filters['start_date'])
+    
+    if filters.get('end_date'):
+        query += " AND date <= ?"
+        params.append(filters['end_date'])
+    
+    if filters.get('start_time'):
+        query += " AND time >= ?"
+        params.append(filters['start_time'])
+    
+    if filters.get('end_time'):
+        query += " AND time <= ?"
+        params.append(filters['end_time'])
+    
+    if filters.get('min_confidence') is not None:
+        query += " AND confidence >= ?"
+        params.append(filters['min_confidence'])
+    
+    if filters.get('max_confidence') is not None:
+        query += " AND confidence <= ?"
+        params.append(filters['max_confidence'])
+    
+    return query, params
+
+def _parse_filters_from_request():
+    cameras = request.args.getlist('camera_id')
+    types = request.args.getlist('violation_type')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    start_time = request.args.get('start_time')
+    end_time = request.args.get('end_time')
+    min_conf = request.args.get('min_confidence', type=float)
+    max_conf = request.args.get('max_confidence', type=float)
+    
+    if min_conf is not None:
+        min_conf = min_conf / 100.0
+    if max_conf is not None:
+        max_conf = max_conf / 100.0
+    
+    return {
+        'camera_id': cameras if cameras else None,
+        'violation_type': types if types else None,
+        'start_date': start_date if start_date else None,
+        'end_date': end_date if end_date else None,
+        'start_time': start_time if start_time else None,
+        'end_time': end_time if end_time else None,
+        'min_confidence': min_conf,
+        'max_confidence': max_conf
+    }
+
+@app.route('/api/stats/types')
+def stats_types():
+    filters = _parse_filters_from_request()
+    
+    query = """
+        SELECT violation_type, COUNT(*) as count
+        FROM violations
+        WHERE 1=1
+    """
+    params = []
+    query, params = _apply_common_filters(query, params, filters)
+    query += " GROUP BY violation_type"
+    
+    conn = logger.connection
+    cursor = conn.cursor()
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    
+    type_names = {
+        'no_helmet': 'Без каски',
+        'no_vest': 'Без жилета',
+        'no_gloves': 'Без перчаток'
+    }
+    result = []
+    for row in rows:
+        result.append({
+            'type': type_names.get(row['violation_type'], row['violation_type']),
+            'count': row['count']
+        })
+    return jsonify(result)
+
+@app.route('/api/stats/daily')
+def stats_daily():
+    filters = _parse_filters_from_request()
+    
+    if not filters.get('start_date') and not filters.get('end_date'):
+        end_date = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        filters['start_date'] = start_date
+        filters['end_date'] = end_date
+    elif not filters.get('start_date'):
+        filters['start_date'] = (datetime.strptime(filters['end_date'], '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
+    elif not filters.get('end_date'):
+        filters['end_date'] = (datetime.strptime(filters['start_date'], '%Y-%m-%d') + timedelta(days=30)).strftime('%Y-%m-%d')
+    
+    query = """
+        SELECT date, COUNT(*) as count
+        FROM violations
+        WHERE 1=1
+    """
+    params = []
+    query, params = _apply_common_filters(query, params, filters)
+    query += " GROUP BY date ORDER BY date ASC"
+    
+    conn = logger.connection
+    cursor = conn.cursor()
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    
+    result = [{'date': row['date'], 'count': row['count']} for row in rows]
+    return jsonify(result)
+
+@app.route('/analytics')
+def analytics():
+    all_cameras = get_unique_camera_ids()
+    return render_template('analytics.html', all_cameras=all_cameras)
 
 def get_unique_camera_ids():
     conn = logger.connection
@@ -73,45 +206,11 @@ def journal():
         **filters
     )
 
-
     count_filters = {k: v for k, v in filters.items() if k not in ('sort_by', 'sort_order')}
     total = logger.get_violations_count(**count_filters)
 
     total_pages = (total + per_page - 1) // per_page if total > 0 else 1
     all_cameras = get_unique_camera_ids()
-
-    print("\n" + "=" * 50)
-    print("СТАТИСТИКА ПО БД:")
-
-    # Проверяем все уникальные типы нарушений
-    conn = logger.connection
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT DISTINCT violation_type, COUNT(*) as cnt FROM violations GROUP BY violation_type")
-    types_stats = cursor.fetchall()
-    for row in types_stats:
-        print(f"  {row['violation_type']}: {row['cnt']} записей")
-
-    # Проверяем записи за 30 апреля
-    cursor.execute("SELECT date, violation_type, camera_id FROM violations WHERE date = '2026-04-30' LIMIT 20")
-    april_30 = cursor.fetchall()
-    print(f"\nЗаписи за 2026-04-30 (первые 20):")
-    for row in april_30:
-        print(f"  {row['date']} | {row['violation_type']} | {row['camera_id']}")
-
-    # Проверяем, есть ли no_helmet в принципе
-    cursor.execute("SELECT COUNT(*) as cnt FROM violations WHERE violation_type = 'no_helmet'")
-    no_helmet_count = cursor.fetchone()['cnt']
-    print(f"\nВсего записей с no_helmet: {no_helmet_count}")
-
-    if no_helmet_count > 0:
-        cursor.execute("SELECT date, time, camera_id FROM violations WHERE violation_type = 'no_helmet' LIMIT 5")
-        samples = cursor.fetchall()
-        print("Примеры записей с no_helmet:")
-        for row in samples:
-            print(f"  {row['date']} {row['time']} | {row['camera_id']}")
-
-    print("=" * 50 + "\n")
 
     return render_template(
         'journal.html',
@@ -124,6 +223,11 @@ def journal():
         filters=filters,
         active_tab='journal'
     )
+
+@app.route('/violations/<path:filename>')
+def serve_violation(filename):
+    violations_dir = Path(__file__).parent.parent / "violations"
+    return send_from_directory(violations_dir, filename)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
