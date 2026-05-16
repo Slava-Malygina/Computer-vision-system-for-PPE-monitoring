@@ -5,7 +5,13 @@ from datetime import datetime, timedelta
 from flask import jsonify, request, send_from_directory
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
+from collections import defaultdict
+from datetime import datetime, timedelta
+from flask import jsonify, request, send_from_directory
+import io
+import tempfile
+from flask import send_file, after_this_request
+from modules.utils.export_log import export_to_csv, export_to_xlsx, export_to_pdf
 from flask import Flask, request, render_template, url_for, redirect
 from modules.database.sqlite_logger import SQLiteLogger
 
@@ -19,36 +25,36 @@ def _apply_common_filters(query, params, filters):
         placeholders = ','.join(['?'] * len(filters['camera_id']))
         query += f" AND camera_id IN ({placeholders})"
         params.extend(filters['camera_id'])
-    
+
     if filters.get('violation_type'):
         placeholders = ','.join(['?'] * len(filters['violation_type']))
         query += f" AND violation_type IN ({placeholders})"
         params.extend(filters['violation_type'])
-    
+
     if filters.get('start_date'):
         query += " AND date >= ?"
         params.append(filters['start_date'])
-    
+
     if filters.get('end_date'):
         query += " AND date <= ?"
         params.append(filters['end_date'])
-    
+
     if filters.get('start_time'):
         query += " AND time >= ?"
         params.append(filters['start_time'])
-    
+
     if filters.get('end_time'):
         query += " AND time <= ?"
         params.append(filters['end_time'])
-    
+
     if filters.get('min_confidence') is not None:
         query += " AND confidence >= ?"
         params.append(filters['min_confidence'])
-    
+
     if filters.get('max_confidence') is not None:
         query += " AND confidence <= ?"
         params.append(filters['max_confidence'])
-    
+
     return query, params
 
 def _parse_filters_from_request():
@@ -60,12 +66,12 @@ def _parse_filters_from_request():
     end_time = request.args.get('end_time')
     min_conf = request.args.get('min_confidence', type=float)
     max_conf = request.args.get('max_confidence', type=float)
-    
+
     if min_conf is not None:
         min_conf = min_conf / 100.0
     if max_conf is not None:
         max_conf = max_conf / 100.0
-    
+
     return {
         'camera_id': cameras if cameras else None,
         'violation_type': types if types else None,
@@ -80,7 +86,7 @@ def _parse_filters_from_request():
 @app.route('/api/stats/types')
 def stats_types():
     filters = _parse_filters_from_request()
-    
+
     query = """
         SELECT violation_type, COUNT(*) as count
         FROM violations
@@ -89,12 +95,12 @@ def stats_types():
     params = []
     query, params = _apply_common_filters(query, params, filters)
     query += " GROUP BY violation_type"
-    
+
     conn = logger.connection
     cursor = conn.cursor()
     cursor.execute(query, params)
     rows = cursor.fetchall()
-    
+
     type_names = {
         'no_helmet': 'Без каски',
         'no_vest': 'Без жилета',
@@ -111,7 +117,7 @@ def stats_types():
 @app.route('/api/stats/daily')
 def stats_daily():
     filters = _parse_filters_from_request()
-    
+
     if not filters.get('start_date') and not filters.get('end_date'):
         end_date = datetime.now().strftime('%Y-%m-%d')
         start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
@@ -121,7 +127,7 @@ def stats_daily():
         filters['start_date'] = (datetime.strptime(filters['end_date'], '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
     elif not filters.get('end_date'):
         filters['end_date'] = (datetime.strptime(filters['start_date'], '%Y-%m-%d') + timedelta(days=30)).strftime('%Y-%m-%d')
-    
+
     query = """
         SELECT date, COUNT(*) as count
         FROM violations
@@ -130,14 +136,283 @@ def stats_daily():
     params = []
     query, params = _apply_common_filters(query, params, filters)
     query += " GROUP BY date ORDER BY date ASC"
-    
+
     conn = logger.connection
     cursor = conn.cursor()
     cursor.execute(query, params)
     rows = cursor.fetchall()
-    
+
     result = [{'date': row['date'], 'count': row['count']} for row in rows]
     return jsonify(result)
+
+def get_filtered_violations(filters, limit=None):
+    query = "SELECT * FROM violations WHERE 1=1"
+    params = []
+
+    if filters.get('camera_id'):
+        placeholders = ','.join(['?'] * len(filters['camera_id']))
+        query += f" AND camera_id IN ({placeholders})"
+        params.extend(filters['camera_id'])
+
+    if filters.get('violation_type'):
+        placeholders = ','.join(['?'] * len(filters['violation_type']))
+        query += f" AND violation_type IN ({placeholders})"
+        params.extend(filters['violation_type'])
+
+    if filters.get('start_date'):
+        query += " AND date >= ?"
+        params.append(filters['start_date'])
+    if filters.get('end_date'):
+        query += " AND date <= ?"
+        params.append(filters['end_date'])
+    if filters.get('start_time'):
+        query += " AND time >= ?"
+        params.append(filters['start_time'])
+    if filters.get('end_time'):
+        query += " AND time <= ?"
+        params.append(filters['end_time'])
+    if filters.get('min_confidence') is not None:
+        query += " AND confidence >= ?"
+        params.append(filters['min_confidence'])
+    if filters.get('max_confidence') is not None:
+        query += " AND confidence <= ?"
+        params.append(filters['max_confidence'])
+
+    sort_by = filters.get('sort_by', 'date')
+    sort_order = filters.get('sort_order', 'DESC')
+    allowed_sort = {'date', 'time', 'confidence'}
+    if sort_by not in allowed_sort:
+        sort_by = 'date'
+    sort_order = 'ASC' if sort_order.upper() == 'ASC' else 'DESC'
+    query += f" ORDER BY {sort_by} {sort_order}"
+
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(limit)
+
+    conn = logger.connection
+    cursor = conn.cursor()
+    cursor.execute(query, params)
+    return [dict(row) for row in cursor.fetchall()]
+
+def _apply_common_filters(query, params, filters):
+    if filters.get('camera_id'):
+        placeholders = ','.join(['?'] * len(filters['camera_id']))
+        query += f" AND camera_id IN ({placeholders})"
+        params.extend(filters['camera_id'])
+
+    if filters.get('violation_type'):
+        placeholders = ','.join(['?'] * len(filters['violation_type']))
+        query += f" AND violation_type IN ({placeholders})"
+        params.extend(filters['violation_type'])
+
+    if filters.get('start_date'):
+        query += " AND date >= ?"
+        params.append(filters['start_date'])
+
+    if filters.get('end_date'):
+        query += " AND date <= ?"
+        params.append(filters['end_date'])
+
+    if filters.get('start_time'):
+        query += " AND time >= ?"
+        params.append(filters['start_time'])
+
+    if filters.get('end_time'):
+        query += " AND time <= ?"
+        params.append(filters['end_time'])
+
+    if filters.get('min_confidence') is not None:
+        query += " AND confidence >= ?"
+        params.append(filters['min_confidence'])
+
+    if filters.get('max_confidence') is not None:
+        query += " AND confidence <= ?"
+        params.append(filters['max_confidence'])
+
+    return query, params
+
+def _parse_filters_from_request():
+    cameras = request.args.getlist('camera_id')
+    types = request.args.getlist('violation_type')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    start_time = request.args.get('start_time')
+    end_time = request.args.get('end_time')
+    min_conf = request.args.get('min_confidence', type=float)
+    max_conf = request.args.get('max_confidence', type=float)
+
+    if min_conf is not None:
+        min_conf = min_conf / 100.0
+    if max_conf is not None:
+        max_conf = max_conf / 100.0
+
+    return {
+        'camera_id': cameras if cameras else None,
+        'violation_type': types if types else None,
+        'start_date': start_date if start_date else None,
+        'end_date': end_date if end_date else None,
+        'start_time': start_time if start_time else None,
+        'end_time': end_time if end_time else None,
+        'min_confidence': min_conf,
+        'max_confidence': max_conf
+    }
+def _parse_export_filters():
+    cameras = request.args.getlist('camera_id')
+    types = request.args.getlist('violation_type')
+    start_date = request.args.get('date_from') or request.args.get('start_date')
+    end_date = request.args.get('date_to') or request.args.get('end_date')
+    start_time = request.args.get('time_from') or request.args.get('start_time')
+    end_time = request.args.get('time_to') or request.args.get('end_time')
+    min_conf = request.args.get('min_confidence', type=float)
+    max_conf = request.args.get('max_confidence', type=float)
+    limit = request.args.get('limit', type=int)
+    sort_by = request.args.get('sort_by', 'date')
+    sort_order = request.args.get('sort_order', 'DESC')
+
+    if min_conf is not None:
+        min_conf = min_conf / 100.0
+    if max_conf is not None:
+        max_conf = max_conf / 100.0
+
+    return {
+        'camera_id': cameras if cameras else None,
+        'violation_type': types if types else None,
+        'start_date': start_date if start_date else None,
+        'end_date': end_date if end_date else None,
+        'start_time': start_time if start_time else None,
+        'end_time': end_time if end_time else None,
+        'min_confidence': min_conf,
+        'max_confidence': max_conf,
+        'sort_by': sort_by,
+        'sort_order': sort_order,
+        'limit': limit
+    }
+
+@app.route('/export/csv')
+def export_csv():
+    filters = _parse_export_filters()
+    data = get_filtered_violations(filters, limit=filters.get('limit'))
+    if not data:
+        return "Нет данных для экспорта", 404
+    output = io.StringIO()
+    import csv
+    writer = csv.DictWriter(output, fieldnames=data[0].keys())
+    writer.writeheader()
+    writer.writerows(data)
+    output.seek(0)
+    return send_file(
+        io.BytesIO(output.getvalue().encode('utf-8-sig')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name='violations_export.csv'
+    )
+
+@app.route('/export/excel')
+def export_excel():
+    filters = _parse_export_filters()
+    data = get_filtered_violations(filters, limit=filters.get('limit'))
+    if not data:
+        return "Нет данных для экспорта", 404
+    with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
+        export_to_xlsx(data, tmp.name)
+        tmp_path = tmp.name
+    @after_this_request
+    def remove_file(response):
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+        return response
+    return send_file(tmp_path, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name='violations_export.xlsx')
+
+@app.route('/export/pdf')
+def export_pdf():
+    filters = _parse_export_filters()
+    data = get_filtered_violations(filters, limit=filters.get('limit'))
+    if not data:
+        return "Нет данных для экспорта", 404
+    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+        export_to_pdf(data, tmp.name)
+        tmp_path = tmp.name
+    @after_this_request
+    def remove_file(response):
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+        return response
+    return send_file(tmp_path, mimetype='application/pdf',
+                     as_attachment=True, download_name='violations_export.pdf')
+
+
+@app.route('/api/stats/types')
+def stats_types():
+    filters = _parse_filters_from_request()
+
+    query = """
+        SELECT violation_type, COUNT(*) as count
+        FROM violations
+        WHERE 1=1
+    """
+    params = []
+    query, params = _apply_common_filters(query, params, filters)
+    query += " GROUP BY violation_type"
+
+    conn = logger.connection
+    cursor = conn.cursor()
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+
+    type_names = {
+        'no_helmet': 'Без каски',
+        'no_vest': 'Без жилета',
+        'no_gloves': 'Без перчаток'
+    }
+    result = []
+    for row in rows:
+        result.append({
+            'type': type_names.get(row['violation_type'], row['violation_type']),
+            'count': row['count']
+        })
+    return jsonify(result)
+
+@app.route('/api/stats/daily')
+def stats_daily():
+    filters = _parse_filters_from_request()
+
+    if not filters.get('start_date') and not filters.get('end_date'):
+        end_date = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        filters['start_date'] = start_date
+        filters['end_date'] = end_date
+    elif not filters.get('start_date'):
+        filters['start_date'] = (datetime.strptime(filters['end_date'], '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
+    elif not filters.get('end_date'):
+        filters['end_date'] = (datetime.strptime(filters['start_date'], '%Y-%m-%d') + timedelta(days=30)).strftime('%Y-%m-%d')
+
+    query = """
+        SELECT date, COUNT(*) as count
+        FROM violations
+        WHERE 1=1
+    """
+    params = []
+    query, params = _apply_common_filters(query, params, filters)
+    query += " GROUP BY date ORDER BY date ASC"
+
+    conn = logger.connection
+    cursor = conn.cursor()
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+
+    result = [{'date': row['date'], 'count': row['count']} for row in rows]
+    return jsonify(result)
+
+@app.route('/analytics')
+def analytics():
+    all_cameras = get_unique_camera_ids()
+    return render_template('analytics.html', all_cameras=all_cameras)
 
 def get_unique_camera_ids():
     conn = logger.connection
@@ -201,6 +476,7 @@ def journal():
         **filters
     )
 
+
     count_filters = {k: v for k, v in filters.items() if k not in ('sort_by', 'sort_order')}
     total = logger.get_violations_count(**count_filters)
 
@@ -218,6 +494,11 @@ def journal():
         filters=filters,
         active_tab='journal'
     )
+
+@app.route('/violations/<path:filename>')
+def serve_violation(filename):
+    violations_dir = Path(__file__).parent.parent / "violations"
+    return send_from_directory(violations_dir, filename)
 
 @app.route('/violations/<path:filename>')
 def serve_violation(filename):
