@@ -256,6 +256,7 @@ def stats_types():
 @app.route('/api/stats/daily')
 def stats_daily():
     filters = _parse_filters_from_request()
+    grouping = request.args.get('grouping', 'day')
 
     if not filters.get('start_date') and not filters.get('end_date'):
         end_date = datetime.now().strftime('%Y-%m-%d')
@@ -267,21 +268,36 @@ def stats_daily():
     elif not filters.get('end_date'):
         filters['end_date'] = (datetime.strptime(filters['start_date'], '%Y-%m-%d') + timedelta(days=30)).strftime('%Y-%m-%d')
 
-    query = """
-        SELECT date, COUNT(*) as count
+    if grouping == 'week':
+        date_expr = "strftime('%Y-W%W', date)"
+    elif grouping == 'month':
+        date_expr = "strftime('%Y-%m', date)"
+    elif grouping == 'year':
+        date_expr = "strftime('%Y', date)"
+    else:
+        date_expr = "date"
+
+    query = f"""
+        SELECT {date_expr} as period, COUNT(*) as count
         FROM violations
         WHERE 1=1
     """
     params = []
     query, params = _apply_common_filters(query, params, filters)
-    query += " GROUP BY date ORDER BY date ASC"
+    query += f" GROUP BY {date_expr} ORDER BY {date_expr} ASC"
 
     conn = logger.connection
     cursor = conn.cursor()
     cursor.execute(query, params)
     rows = cursor.fetchall()
 
-    result = [{'date': row['date'], 'count': row['count']} for row in rows]
+    result = [
+        {
+            'date': row['period'],
+            'count': row['count']
+        }
+        for row in rows
+    ]
     return jsonify(result)
 
 

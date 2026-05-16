@@ -2,9 +2,10 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log("DOM готов");
 
     let filtersState = {
-    start_date: null,
-    end_date: null,
-    cameras: []
+        start_date: null,
+        end_date: null,
+        cameras: [],
+        grouping: 'day'
     };
 
     function buildApiUrl(baseUrl, filters) {
@@ -24,7 +25,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (filters.end_date) {
             params.append('end_date', filters.end_date);
         }
-
+        if (filters.grouping) {
+            params.append('grouping', filters.grouping);
+        }
         const query = params.toString();
         if (query) url += '?' + query;
 
@@ -172,6 +175,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         return { start, end };
     }
+
+    function getSelectedGrouping() {
+        return document.querySelector(
+            'input[name="grouping"]:checked'
+        )?.value || 'day';
+    }
+
+
     const OTHER_CAMERA_VALUES = ['camera', 'Видео', 'Веб-камера', 'video'];
     function getSelectedCameras() {
         const otherCheckbox = document.getElementById('other-cameras-checkbox');
@@ -203,6 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
         filtersState.start_date = period.start;
         filtersState.end_date = period.end;
         filtersState.cameras = cameras;
+        filtersState.grouping = getSelectedGrouping();
 
         console.log("STATE:", filtersState);
     }
