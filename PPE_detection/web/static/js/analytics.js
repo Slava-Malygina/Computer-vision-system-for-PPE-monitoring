@@ -484,47 +484,35 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     const downloadBtn = document.getElementById('download-report-btn');
-
     if (downloadBtn) {
-
         downloadBtn.addEventListener('click', () => {
-
             const format = document.querySelector(
                 'input[name="export-format"]:checked'
             ).value;
-
             const params = new URLSearchParams();
-
             const fullReport = document.getElementById(
                 'full-report-checkbox'
             ).checked;
-
             if (!fullReport) {
-
                 const limit = document.getElementById(
                     'records-limit-input'
                 ).value;
-
                 if (limit) {
                     params.append('limit', limit);
                 }
             }
-
             if (
                 document.getElementById(
                     'apply-journal-filters-checkbox'
                 ).checked
             ) {
-
                 const journalParams = new URLSearchParams(
                     localStorage.getItem('journalFilters') || ''
                 );
-
                 journalParams.forEach((value, key) => {
                     params.append(key, value);
                 });
             }
-
             window.location.href =
                 `/export/${format}?${params.toString()}`;
         });
