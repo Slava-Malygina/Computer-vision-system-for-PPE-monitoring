@@ -24,6 +24,10 @@
         <div class="section-spacer"></div>
             <div class="filters-section">
                 <div class="filters-area" id="filters-area">
+
+                    <div class="section-title">
+                        Настройки графиков
+                    </div>
                     <div class="filter-group filter-group-row">
                         <label>Период:</label>
                         <div class="period-buttons">
@@ -76,6 +80,104 @@
                 </div>
             </div>
 
+            <div class="section-spacer"></div>
+
+            <div class="export-section">
+    <div class="filters-area export-area">
+
+        <div class="section-title">
+            Экспорт
+        </div>
+
+        <div class="filter-group filter-group-row">
+            <label>Формат:</label>
+
+            <div class="period-buttons">
+                <label class="radio-label">
+                    <input type="radio" name="export-format" value="xlsx" checked>
+                    XLSX
+                </label>
+
+                <label class="radio-label">
+                    <input type="radio" name="export-format" value="pdf">
+                    PDF
+                </label>
+
+                <label class="radio-label">
+                    <input type="radio" name="export-format" value="csv">
+                    CSV
+                </label>
+            </div>
+        </div>
+
+        <div class="filter-group export-options-group">
+
+            <label>Вид отчета:</label>
+
+            <div class="export-checkboxes">
+
+                <label class="glass-checkbox">
+                    <input type="checkbox" id="full-report-checkbox" checked>
+                    <span class="custom-checkbox"></span>
+                    Полный
+                </label>
+
+                <label class="glass-checkbox">
+                    <input type="checkbox" id="apply-journal-filters-checkbox">
+                    <span class="custom-checkbox"></span>
+                    Применить фильтры
+                </label>
+
+            </div>
+            <div
+                class="records-limit-wrapper"
+                id="records-limit-wrapper"
+                style="display: none;"
+            >
+
+                <label>Количество записей:</label>
+
+                <div class="records-input-box">
+
+                    <input
+                        type="number"
+                        id="records-limit-input"
+                        class="records-limit-input"
+                        min="1"
+                        max="100000"
+                        value="100"
+                    >
+
+                    <div class="records-spinner">
+                        <button type="button" id="records-up-btn">▲</button>
+                        <button type="button" id="records-down-btn">▼</button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="active-filters-box" id="active-filters-box" style="display: none;">
+
+            <div class="active-filters-title">
+                Действующие параметры
+            </div>
+
+            <div class="active-filters-list" id="active-filters-list">
+
+            </div>
+        </div>
+
+
+
+        <div class="filter-buttons">
+            <button id="download-report-btn" class="btn-primary">
+                Скачать
+            </button>
+        </div>
+
+    </div>
+</div>
     </div>
 </div>
 {% endblock %}

@@ -327,6 +327,136 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+
+    const applyJournalFiltersCheckbox = document.getElementById('apply-journal-filters-checkbox');
+    const activeFiltersBox = document.getElementById('active-filters-box');
+    const activeFiltersList = document.getElementById('active-filters-list');
+
+    function getJournalFilters() {
+        const params = new URLSearchParams(localStorage.getItem('journalFilters') || '');
+
+        return {
+            cameras: params.getAll('camera_id'),
+            violations: params.getAll('violation_type'),
+            dateFrom: params.get('date_from'),
+            dateTo: params.get('date_to'),
+            timeFrom: params.get('time_from'),
+            timeTo: params.get('time_to'),
+            minConfidence: params.get('min_confidence'),
+            maxConfidence: params.get('max_confidence'),
+            sortBy: params.get('sort_by'),
+            sortOrder: params.get('sort_order')
+        };
+    }
+
+    function renderActiveFilters() {
+
+        const filters = getJournalFilters();
+
+        const violationNames = {
+            no_helmet: 'Без каски',
+            no_vest: 'Без жилета',
+            no_gloves: 'Без перчаток'
+        };
+
+        const sortNames = {
+            date: 'Дата',
+            time: 'Время',
+            confidence: 'Вероятность'
+        };
+
+        const sortOrderNames = {
+            ASC: 'По возрастанию',
+            DESC: 'По убыванию'
+        };
+
+        activeFiltersList.innerHTML = `
+            <div class="filter-info-item">
+                <span class="filter-info-label">Период:</span>
+                <span class="filter-info-value">
+                    ${filters.dateFrom || '—'} — ${filters.dateTo || '—'}
+                </span>
+            </div>
+
+            <div class="filter-info-item">
+                <span class="filter-info-label">Время:</span>
+                <span class="filter-info-value">
+                    ${filters.timeFrom || '—'} — ${filters.timeTo || '—'}
+                </span>
+            </div>
+
+            <div class="filter-info-item">
+                <span class="filter-info-label">Камеры:</span>
+                <span class="filter-info-value">
+                    ${filters.cameras.length ? filters.cameras.join(', ') : 'Все'}
+                </span>
+            </div>
+
+            <div class="filter-info-item">
+                <span class="filter-info-label">Нарушения:</span>
+                <span class="filter-info-value">
+                    ${
+                        filters.violations.length
+                        ? filters.violations.map(v => violationNames[v] || v).join(', ')
+                        : 'Все'
+                    }
+                </span>
+            </div>
+
+            <div class="filter-info-item">
+                <span class="filter-info-label">Вероятность:</span>
+                <span class="filter-info-value">
+                    ${filters.minConfidence || 0}% — ${filters.maxConfidence || 100}%
+                </span>
+            </div>
+
+            <div class="filter-info-item">
+                <span class="filter-info-label">Сортировка:</span>
+                <span class="filter-info-value">
+                    ${sortNames[filters.sortBy] || 'Дата'} •
+                    ${sortOrderNames[filters.sortOrder] || 'По убыванию'}
+                </span>
+            </div>
+        `;
+    }
+
+
+    applyJournalFiltersCheckbox?.addEventListener('change', () => {
+
+        if (applyJournalFiltersCheckbox.checked) {
+
+            activeFiltersBox.style.display = 'block';
+            renderActiveFilters();
+
+        } else {
+
+            activeFiltersBox.style.display = 'none';
+        }
+    });
+
+    const fullReportCheckbox = document.getElementById('full-report-checkbox');
+
+    const recordsLimitWrapper = document.getElementById('records-limit-wrapper');
+
+    function updateRecordsLimitVisibility() {
+
+        if (fullReportCheckbox.checked) {
+
+            recordsLimitWrapper.style.display = 'none';
+
+        } else {
+
+            recordsLimitWrapper.style.display = 'flex';
+        }
+    }
+
+    fullReportCheckbox?.addEventListener(
+        'change',
+        updateRecordsLimitVisibility
+    );
+
+    updateRecordsLimitVisibility();
+
     function initDefaultFilters() {
         const today = new Date();
         const start = new Date();
@@ -338,6 +468,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     initDefaultFilters();
     loadCharts(filtersState);
+
+    const recordsInput = document.getElementById('records-limit-input');
+
+    document.getElementById('records-up-btn')?.addEventListener('click', () => {
+
+        recordsInput.stepUp();
+    });
+
+    document.getElementById('records-down-btn')?.addEventListener('click', () => {
+
+        recordsInput.stepDown();
+    });
 
 
 });

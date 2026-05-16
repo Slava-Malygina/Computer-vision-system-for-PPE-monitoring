@@ -145,7 +145,10 @@ document.addEventListener('DOMContentLoaded', function() {
         url.searchParams.append('sort_by', sortField.value);
         url.searchParams.append('sort_order', sortOrder.value);
         if (perPageSelect) url.searchParams.append('per_page', perPageSelect.value);
-
+        localStorage.setItem(
+            'journalFilters',
+            url.searchParams.toString()
+        );
         window.location.href = url.toString();
     }
 
