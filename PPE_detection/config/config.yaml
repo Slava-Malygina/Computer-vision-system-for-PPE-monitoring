@@ -1,3 +1,6 @@
+web_auth:
+  login: victoria
+  password: sama_ty_horoshaya
 cameras:
 - rtsp_url: rtsp://localhost:8554/stream1
   detection_thresholds:
