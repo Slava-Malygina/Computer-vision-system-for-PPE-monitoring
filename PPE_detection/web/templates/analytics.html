@@ -1,222 +1,242 @@
-{% extends "base.html" %}
+document.addEventListener('DOMContentLoaded', function () {
+    console.log("DOM готов");
 
-{% block extra_styles %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/analytics_style.css') }}">
-{% endblock %}
+    let allCameras = [];
+    let filtersState = {
+        start_date: null,
+        end_date: null,
+        cameras: null,
+        grouping: 'day'
+    };
 
-{% block content %}
-<div class="analytics-container">
-    <div class="glass-panel">
-        <div class="charts-section">
-            <div class="charts-grid">
-                <div class="chart-card">
-                    <h3>Распределение по типам нарушений</h3>
-                    <canvas id="chart-types"></canvas>
-                </div>
+    async function loadCamerasFromDB() {
+        try {
+            const response = await fetch('/api/cameras');
+            const cameras = await response.json();
+            allCameras = cameras;
+            const container = document.getElementById('camera-dropdown');
+            if (!container) return;
+            container.innerHTML = '';
+            if (cameras.length === 0) {
+                container.innerHTML = '<div class="no-data">Нет данных о камерах</div>';
+                return;
+            }
+            cameras.forEach(cam => {
+                const label = document.createElement('label');
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = cam;
+                cb.checked = true;
+                label.appendChild(cb);
+                label.appendChild(document.createTextNode(' ' + cam));
+                container.appendChild(label);
+            });
+        } catch (e) {
+            console.error('Ошибка загрузки камер:', e);
+        }
+    }
 
-                <div class="chart-card">
-                    <h3>Динамика нарушений по дням</h3>
-                    <canvas id="chart-daily"></canvas>
-                </div>
-            </div>
-        </div>
+    function getSelectedCameras() {
+        const checkboxes = document.querySelectorAll('#camera-dropdown input[type="checkbox"]');
+        const selected = Array.from(checkboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+        return selected.length === 0 ? null : selected;
+    }
 
-        <div class="section-spacer"></div>
-            <div class="filters-section">
-                <div class="filters-area" id="filters-area">
+    function getSelectedPeriod() {
+        const selected = document.querySelector('input[name="period"]:checked')?.value;
+        const today = new Date();
+        let start = null;
+        let end = today.toISOString().split('T')[0];
 
-                    <div class="section-title">
-                        Настройки графиков
-                    </div>
-                    <div class="filter-group filter-group-row">
-                        <label>Период:</label>
-                        <div class="period-buttons">
-                            <label class="radio-label">
-                                <input type="radio" name="period" value="7days"> 7 дней
-                            </label>
-                            <label class="radio-label">
-                                <input type="radio" name="period" value="30days"> 30 дней
-                            </label>
-                            <label class="radio-label">
-                                <input type="radio" name="period" value="3months"> 3 мес
-                            </label>
-                            <label class="radio-label">
-                                <input type="radio" name="period" value="year"> Год
-                            </label>
-                            <label class="radio-label">
-                                <input type="radio" name="period" value="custom" id="custom-period-radio"> Другое
-                            </label>
-                        </div>
-                    </div>
+        if (selected === '7days') {
+            const d = new Date();
+            d.setDate(d.getDate() - 7);
+            start = d.toISOString().split('T')[0];
+        } else if (selected === '30days') {
+            const d = new Date();
+            d.setDate(d.getDate() - 30);
+            start = d.toISOString().split('T')[0];
+        } else if (selected === '3months') {
+            const d = new Date();
+            d.setMonth(d.getMonth() - 3);
+            start = d.toISOString().split('T')[0];
+        } else if (selected === 'year') {
+            const d = new Date();
+            d.setFullYear(d.getFullYear() - 1);
+            start = d.toISOString().split('T')[0];
+        } else if (selected === 'custom') {
+            start = document.getElementById('date-from')?.value || null;
+            end = document.getElementById('date-to')?.value || null;
+        }
+        return { start, end };
+    }
 
-                    <div class="filter-group filter-group-row" id="custom-date-range" style="display: none;">
-                        <label>Свой период:</label>
-                        <div class="date-range-wrapper">
-                            <input type="date" id="date-from" class="date-input">
-                            <span>—</span>
-                            <input type="date" id="date-to" class="date-input">
-                        </div>
-                    </div>
+    function getSelectedGrouping() {
+        return document.querySelector('input[name="grouping"]:checked')?.value || 'day';
+    }
 
-                    <div class="filter-group filter-group-row">
-                        <label>Группировка:</label>
+    function buildApiUrl(baseUrl, filters) {
+        let url = baseUrl;
+        const params = new URLSearchParams();
+        if (filters.cameras && filters.cameras.length) {
+            filters.cameras.forEach(c => params.append('camera_id', c));
+        }
+        if (filters.start_date) params.append('start_date', filters.start_date);
+        if (filters.end_date) params.append('end_date', filters.end_date);
+        if (filters.grouping) params.append('grouping', filters.grouping);
+        const query = params.toString();
+        if (query) url += '?' + query;
+        return url;
+    }
 
-                        <div class="period-buttons">
+    async function loadCharts(filters) {
+        try {
+            const typesUrl = buildApiUrl('/api/stats/types', filters);
+            const typesResponse = await fetch(typesUrl);
+            const typesData = await typesResponse.json();
 
-                            <label class="radio-label">
-                                <input type="radio" name="grouping" value="day" checked>
-                                Дни
-                            </label>
+            const ctxTypes = document.getElementById('chart-types').getContext('2d');
+            if (window.typesChart) window.typesChart.destroy();
+            window.typesChart = new Chart(ctxTypes, {
+                type: 'pie',
+                data: {
+                    labels: typesData.map(i => i.type),
+                    datasets: [{
+                        data: typesData.map(i => i.count),
+                        backgroundColor: ['#E677FF', '#7C79FC', '#7DCFFF'],
+                        borderColor: 'transparent'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#ffffff', font: { size: 12 } } },
+                        tooltip: { backgroundColor: '#ffffff', titleColor: '#111827', bodyColor: '#111827' }
+                    }
+                }
+            });
 
-                            <label class="radio-label">
-                                <input type="radio" name="grouping" value="week">
-                                Недели
-                            </label>
+            const dailyUrl = buildApiUrl('/api/stats/daily', filters);
+            const dailyResponse = await fetch(dailyUrl);
+            const dailyData = await dailyResponse.json();
 
-                            <label class="radio-label">
-                                <input type="radio" name="grouping" value="month">
-                                Месяцы
-                            </label>
+            const ctxDaily = document.getElementById('chart-daily').getContext('2d');
+            if (window.dailyChart) window.dailyChart.destroy();
+            window.dailyChart = new Chart(ctxDaily, {
+                type: 'line',
+                data: {
+                    labels: dailyData.map(i => i.date),
+                    datasets: [{
+                        label: 'Количество нарушений',
+                        data: dailyData.map(i => i.count),
+                        borderColor: '#7C79FC',
+                        backgroundColor: 'rgba(124, 121, 252, 0.15)',
+                        pointBackgroundColor: '#7DCFFF',
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.15)' } },
+                        y: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.15)' }, beginAtZero: true }
+                    },
+                    plugins: { legend: { labels: { color: '#ffffff' } } }
+                }
+            });
+        } catch (e) {
+            console.error(e);
+        }
+    }
 
-                            <label class="radio-label">
-                                <input type="radio" name="grouping" value="year">
-                                Годы
-                            </label>
+    function updateFiltersState() {
+        const period = getSelectedPeriod();
+        filtersState.start_date = period.start;
+        filtersState.end_date = period.end;
+        filtersState.cameras = getSelectedCameras();
+        filtersState.grouping = getSelectedGrouping();
+        console.log("STATE:", filtersState);
+    }
 
-                        </div>
-                    </div>
+    const applyBtn = document.getElementById('apply-filters-analytics');
+    if (applyBtn) {
+        applyBtn.addEventListener('click', function () {
+            updateFiltersState();
+            loadCharts(filtersState);
+        });
+    }
 
+    const customRadio = document.getElementById('custom-period-radio');
+    const customDateRange = document.getElementById('custom-date-range');
+    function toggleCustomDateRange() {
+        if (customRadio && customRadio.checked) {
+            customDateRange.style.display = 'flex';
+        } else {
+            customDateRange.style.display = 'none';
+        }
+    }
+    if (customRadio) {
+        customRadio.addEventListener('change', toggleCustomDateRange);
+        document.querySelectorAll('input[name="period"]').forEach(radio => {
+            radio.addEventListener('change', () => setTimeout(toggleCustomDateRange, 10));
+        });
+        toggleCustomDateRange();
+    }
 
-                    <div class="filter-group camera-selector">
-                        <label>По камере:</label>
-                        <div class="dropdown-checkbox">
-                            <button type="button" class="dropdown-btn" id="camera-dropdown-btn">
-                                Выбрать камеры <span class="arrow">▼</span>
-                            </button>
-                            <div class="dropdown-content" id="camera-dropdown">
-                                <label><input type="checkbox" value="rtsp://localhost:8554/stream1" checked> rtsp://localhost:8554/stream1</label>
-                                <label><input type="checkbox" value="rtsp://localhost:8554/stream2" checked> rtsp://localhost:8554/stream2</label>
-                                <label><input type="checkbox" value="rtsp://localhost:8554/stream3" checked> rtsp://localhost:8554/stream3</label>
-                                <label><input type="checkbox" value="rtsp://localhost:8554/stream4" checked> rtsp://localhost:8554/stream4</label>
+    const cameraDropdownBtn = document.getElementById('camera-dropdown-btn');
+    const cameraDropdown = document.getElementById('camera-dropdown');
+    const cameraArrow = cameraDropdownBtn?.querySelector('.arrow');
+    if (cameraDropdownBtn) {
+        cameraDropdownBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            cameraDropdown.classList.toggle('show');
+            cameraArrow?.classList.toggle('rotated');
+        });
+    }
+    if (cameraDropdown) {
+        cameraDropdown.addEventListener('click', (e) => e.stopPropagation());
+    }
+    document.addEventListener('click', () => {
+        cameraDropdown?.classList.remove('show');
+        cameraArrow?.classList.remove('rotated');
+    });
 
-                                <label><input type="checkbox" value="other" checked id="other-cameras-checkbox"> Другое (веб-камера, видео и т.д.)</label>
-                            </div>
-                        </div>
-                    </div>
+    const downloadBtn = document.getElementById('download-report-btn');
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', () => {
+            const format = document.querySelector('input[name="export-format"]:checked').value;
+            const params = new URLSearchParams();
+            const fullReport = document.getElementById('full-report-checkbox').checked;
+            if (!fullReport) {
+                const limit = document.getElementById('records-limit-input').value;
+                if (limit) params.append('limit', limit);
+            }
+            if (document.getElementById('apply-journal-filters-checkbox').checked) {
+                const journalParams = new URLSearchParams(localStorage.getItem('journalFilters') || '');
+                journalParams.forEach((value, key) => params.append(key, value));
+            } else {
+                if (filtersState.cameras) {
+                    filtersState.cameras.forEach(c => params.append('camera_id', c));
+                }
+                if (filtersState.start_date) params.append('start_date', filtersState.start_date);
+                if (filtersState.end_date) params.append('end_date', filtersState.end_date);
+            }
+            window.location.href = `/export/${format}?${params.toString()}`;
+        });
+    }
 
-                    <div class="filter-buttons">
-                        <button id="apply-filters-analytics" class="btn-primary">Применить</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="section-spacer"></div>
-
-            <div class="export-section">
-    <div class="filters-area export-area">
-
-        <div class="section-title">
-            Экспорт
-        </div>
-
-        <div class="filter-group filter-group-row">
-            <label>Формат:</label>
-
-            <div class="period-buttons">
-                <label class="radio-label">
-                    <input type="radio" name="export-format" value="xlsx" checked>
-                    XLSX
-                </label>
-
-                <label class="radio-label">
-                    <input type="radio" name="export-format" value="pdf">
-                    PDF
-                </label>
-
-                <label class="radio-label">
-                    <input type="radio" name="export-format" value="csv">
-                    CSV
-                </label>
-            </div>
-        </div>
-
-        <div class="filter-group export-options-group">
-
-            <label>Вид отчета:</label>
-
-            <div class="export-checkboxes">
-
-                <label class="glass-checkbox">
-                    <input type="checkbox" id="full-report-checkbox" checked>
-                    <span class="custom-checkbox"></span>
-                    Полный
-                </label>
-
-                <label class="glass-checkbox">
-                    <input type="checkbox" id="apply-journal-filters-checkbox">
-                    <span class="custom-checkbox"></span>
-                    Применить фильтры
-                </label>
-
-            </div>
-            <div
-                class="records-limit-wrapper"
-                id="records-limit-wrapper"
-                style="display: none;"
-            >
-
-                <label>Количество записей:</label>
-
-                <div class="records-input-box">
-
-                    <input
-                        type="number"
-                        id="records-limit-input"
-                        class="records-limit-input"
-                        min="1"
-                        max="100000"
-                        value="100"
-                    >
-
-                    <div class="records-spinner">
-                        <button type="button" id="records-up-btn">▲</button>
-                        <button type="button" id="records-down-btn">▼</button>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-
-        <div class="active-filters-box" id="active-filters-box" style="display: none;">
-
-            <div class="active-filters-title">
-                Действующие параметры
-            </div>
-
-            <div class="active-filters-list" id="active-filters-list">
-
-            </div>
-        </div>
-
-
-
-        <div class="filter-buttons">
-            <button id="download-report-btn" class="btn-primary">
-                Скачать
-            </button>
-        </div>
-
-    </div>
-</div>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_scripts %}
-<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
-
-{% endblock %}
-
-
+    async function init() {
+        await loadCamerasFromDB();
+        const defaultPeriodRadio = document.querySelector('input[name="period"][value="30days"]');
+        if (defaultPeriodRadio) defaultPeriodRadio.checked = true;
+        toggleCustomDateRange();
+        updateFiltersState();
+        loadCharts(filtersState);
+    }
+    init();
+});
