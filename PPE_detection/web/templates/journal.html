@@ -71,7 +71,10 @@
                         <label><input type="checkbox" value="rtsp://localhost:8554/stream3" checked> rtsp://localhost:8554/stream3</label>
                         <label><input type="checkbox" value="rtsp://localhost:8554/stream4" checked> rtsp://localhost:8554/stream4</label>
 
-                        <label><input type="checkbox" value="other" checked id="other-cameras-checkbox"> Другое (веб-камера, видео и т.д.)</label>
+                        <label>
+                            <input type="checkbox" checked id="other-cameras-checkbox">
+                            Другое (веб-камера, видео и т.д.)
+                        </label>
                     </div>
                 </div>
             </div>
@@ -94,9 +97,9 @@
             <div class="filter-group date-range-group">
                 <label>Диапазон дат:</label>
                 <div class="date-range-row">
-                    <input type="date" id="date-from" value="2026-03-29">
+                    <input type="date" id="date-from" value="2026-03-29" class="date-input">
                     <span>—</span>
-                    <input type="date" id="date-to" value="2026-04-29">
+                    <input type="date" id="date-to" value="2026-04-29" class="date-input">
                 </div>
             </div>
 
@@ -122,18 +125,59 @@
 
         <div class="filter-section">
             <h3>Сортировать</h3>
+
             <div class="filter-group sort-group">
-                <select id="sort-field">
-                    <option value="date">Дата</option>
-                    <option value="time">Время</option>
-                    <option value="confidence">Вероятность</option>
-                </select>
-                <select id="sort-order">
-                    <option value="DESC">По убыванию</option>
-                    <option value="ASC">По возрастанию</option>
-                </select>
+
+                <div class="dropdown-checkbox custom-select" id="sort-field-wrapper">
+                    <button type="button" class="dropdown-btn" id="sort-field-btn">
+                        <span id="sort-field-text">Дата</span>
+                        <span class="arrow">▼</span>
+                    </button>
+
+                    <div class="dropdown-content" id="sort-field-dropdown">
+
+                        <label data-value="date">
+                            Дата
+                        </label>
+
+                        <label data-value="time">
+                            Время
+                        </label>
+
+                        <label data-value="confidence">
+                            Вероятность
+                        </label>
+
+                    </div>
+
+                    <input type="hidden" id="sort-field" value="date">
+                </div>
+
+
+                <div class="dropdown-checkbox custom-select" id="sort-order-wrapper">
+                    <button type="button" class="dropdown-btn" id="sort-order-btn">
+                        <span id="sort-order-text">По убыванию</span>
+                        <span class="arrow">▼</span>
+                    </button>
+
+                    <div class="dropdown-content" id="sort-order-dropdown">
+
+                        <label data-value="DESC">
+                            По убыванию
+                        </label>
+
+                        <label data-value="ASC">
+                            По возрастанию
+                        </label>
+
+                    </div>
+
+                    <input type="hidden" id="sort-order" value="DESC">
+                </div>
+
             </div>
         </div>
+
 
         <div class="filter-buttons">
             <button id="apply-filters" class="btn-primary">Применить</button>

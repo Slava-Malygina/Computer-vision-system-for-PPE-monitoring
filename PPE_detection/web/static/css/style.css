@@ -288,12 +288,6 @@ body {
     background: rgba(93, 73, 129, 0.5);
 }
 
-.dropdown-content input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-    accent-color: #7DCFFF;
-}
 
 .arrow {
     font-size: 12px;
@@ -305,43 +299,97 @@ body {
 }
 
 
-input[type="date"],
+.date-input,
 input[type="time"],
-input[type="number"],
 select {
-    background: rgba(50, 48, 85, 0.8);
-    color: #ffffff;
-    border: 1px solid #2a68ff;
-    border-radius: 10px;
-    padding: 10px 12px;
+    width: 160px;
+    padding: 10px 14px;
+
+    border-radius: 18px;
     font-size: 14px;
-    width: 100%;
-    transition: all 0.3s ease;
-}
 
-input[type="date"]:hover,
-input[type="time"]:hover,
-input[type="number"]:hover,
-select:hover {
-    border-color: #7DCFFF;
-    background: #ffffff;
-}
+    color: #eaeaff;
 
-input[type="date"]:focus,
-input[type="time"]:focus,
-input[type="number"]:focus,
-select:focus {
+    background:
+        linear-gradient(
+            135deg,
+            rgba(255,255,255,0.08),
+            rgba(255,255,255,0.03)
+        );
+
+    border: 1px solid rgba(255,255,255,0.12);
+
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+
+    box-shadow:
+        0 4px 20px rgba(0,0,0,0.18),
+        inset 0 1px 1px rgba(255,255,255,0.04);
+
+    cursor: pointer;
+    transition: all 0.25s ease;
+
     outline: none;
-    border-color: #E677FF;
-    box-shadow: 0 0 5px rgba(230, 119, 255, 0.3);
+
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+
+    color-scheme: dark;
+
+    position: relative;
+}
+.date-input:hover,
+input[type="time"]:hover,
+select:hover {
+    transform: translateY(-2px);
+
+    border-color: rgba(125, 207, 255, 0.4);
+
+    box-shadow:
+        0 0 18px rgba(125, 207, 255, 0.12),
+        0 6px 24px rgba(0,0,0,0.25);
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(255,255,255,0.10),
+            rgba(255,255,255,0.04)
+        );
+}
+option {
+    background: #252540;
+    color: #ffffff;
+}
+.date-input:focus,
+input[type="time"]:focus,
+select:focus {
+    border-color: #7DCFFF;
+
+    box-shadow:
+        0 0 0 2px rgba(125, 207, 255, 0.20),
+        0 0 18px rgba(125, 207, 255, 0.15);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+ input[type="time"]::-webkit-calendar-picker-indicator:hover
+ {
+    opacity: 1;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator{
+    filter: invert(1);
+    opacity: 0.85;
+    cursor: pointer;
 }
 
 
 .range-slider {
     display: flex;
     align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
+    gap: 10px;
+    flex-wrap: nowrap;
     background: rgba(0, 0, 0, 0.1);
     border-radius: 10px;
     padding: 10px;
@@ -538,17 +586,17 @@ input[type="radio"] {
 .date-range-row, .time-range-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
+    flex-wrap: nowrap;
+    justify-content: center;
 }
 
-.date-range-row input, .time-range-row input {
-    flex: 1;
-}
-
-.date-range-row span, .time-range-row span {
+.date-range-row span,
+.time-range-row span{
     color: #ffffff;
     font-weight: bold;
 }
+
 .tab-bar {
     display: flex;
     gap: 10px;
@@ -644,28 +692,6 @@ input[type="radio"] {
     gap: 15px;
 }
 
-.sort-group select {
-    flex: 1;
-    background: rgba(50, 48, 85, 0.8);
-    color: #ffffff;
-    border: 1px solid #2a68ff;
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.sort-group select:hover {
-    border-color: #7DCFFF;
-    background: #282650;
-}
-
-.sort-group select:focus {
-    outline: none;
-    border-color: #E677FF;
-    box-shadow: 0 0 5px rgba(230, 119, 255, 0.3);
-}
 @media (max-width: 768px) {
     .main-layout {
         flex-direction: column;
@@ -783,3 +809,155 @@ html::-webkit-scrollbar-thumb:hover {
     cursor: pointer;
 }
 
+.camera-selector .dropdown-btn,
+.dropdown-checkbox .dropdown-btn {
+    width: 320px;
+    max-width: 100%;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 12px 14px;
+    border-radius: 20px;
+
+
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #eaeaff;
+    font-weight: 500;
+
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+
+    cursor: pointer;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    transition: 0.25s ease;
+}
+
+.camera-selector .dropdown-btn:hover,
+.dropdown-checkbox .dropdown-btn:hover {
+    transform: translateY(-2px);
+    border-color: rgba(125, 207, 255, 0.4);
+    box-shadow: 0 0 18px rgba(125, 207, 255, 0.12);
+}
+
+
+.camera-selector .dropdown-content,
+.dropdown-checkbox .dropdown-content {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+
+    width: 320px;
+    max-height: 260px;
+    overflow-y: auto;
+
+    padding: 12px;
+
+    border-radius: 16px;
+
+    background: rgba(20, 20, 40, 0.55);
+    backdrop-filter: blur(18px);
+
+    border: 1px solid rgba(255, 255, 255, 0.10);
+
+    box-shadow:
+        0 10px 30px rgba(0,0,0,0.35),
+        0 0 25px rgba(230, 119, 255, 0.08);
+
+    z-index: 100;
+}
+
+.camera-selector .dropdown-content label,
+.dropdown-checkbox .dropdown-content label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    padding: 10px 10px;
+    border-radius: 10px;
+
+    color: #eaeaff;
+    font-size: 13px;
+
+    cursor: pointer;
+
+    transition: 0.2s ease;
+}
+
+
+.camera-selector, .dropdown-checkbox {
+    position: relative;
+    width: 100%;
+}
+
+.camera-selector .dropdown-content label:hover,
+.dropdown-checkbox .dropdown-content label:hover {
+    background: rgba(125, 207, 255, 0.10);
+    transform: translateX(2px);
+}
+
+.camera-selector .dropdown-content input[type="checkbox"],
+.dropdown-checkbox .dropdown-content input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+
+    width: 16px;
+    height: 16px;
+
+    border-radius: 5px;
+
+    border: 1px solid rgba(255,255,255,0.25);
+
+    background: rgba(255,255,255,0.05);
+
+    display: grid;
+    place-content: center;
+
+    cursor: pointer;
+
+    transition: 0.2s ease;
+}
+
+.camera-selector .dropdown-content input[type="checkbox"]:checked,
+.dropdown-checkbox .dropdown-content input[type="checkbox"]:checked{
+    background: linear-gradient(135deg, #E677FF, #7C79FC, #7DCFFF);
+    border: none;
+}
+
+.camera-selector .dropdown-content input[type="checkbox"]:checked::after,
+.dropdown-checkbox .dropdown-content input[type="checkbox"]:checked::after{
+    content: "✓";
+    font-size: 11px;
+    color: white;
+    font-weight: bold;
+}
+
+.camera-selector .dropdown-content::-webkit-scrollbar,
+.dropdown-checkbox .dropdown-content::-webkit-scrollbar{
+    width: 5px;
+}
+
+.camera-selector .dropdown-content::-webkit-scrollbar-thumb,
+.dropdown-checkbox .dropdown-content::-webkit-scrollbar-thumb{
+    background: linear-gradient(135deg, #E677FF, #7C79FC, #7DCFFF);
+    border-radius: 10px;
+}
+
+.custom-select {
+    width: 220px;
+}
+
+.custom-select .dropdown-btn {
+    width: 100%;
+}
+
+.custom-select .dropdown-content {
+    width: 100%;
+}
+
+.custom-select .dropdown-content label {
+    justify-content: flex-start;
+}

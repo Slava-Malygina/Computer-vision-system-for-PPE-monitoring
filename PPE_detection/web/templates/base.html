@@ -10,7 +10,10 @@
 <body>
     <div class="container">
         <div class="tab-bar">
-            <button class="tab-btn {% if active_tab == 'journal' %}active{% endif %}" onclick="location.href='/journal'">
+            <button
+                id="journal-tab-btn"
+                class="tab-btn {% if active_tab == 'journal' %}active{% endif %}"
+            >
                 Журнал нарушений
             </button>
             <button class="tab-btn {% if active_tab == 'analytics' %}active{% endif %}" onclick="location.href='/analytics'">
@@ -29,6 +32,21 @@
                 this.classList.add('active');
             });
         });
+
+        const journalBtn = document.getElementById('journal-tab-btn');
+
+        if (journalBtn) {
+            journalBtn.addEventListener('click', function() {
+
+                const savedFilters = localStorage.getItem('journalFilters');
+
+                if (savedFilters) {
+                    window.location.href = '/journal?' + savedFilters;
+                } else {
+                    window.location.href = '/journal';
+                }
+            });
+        }
     </script>
     {% block extra_scripts %}{% endblock %}
 </body>
