@@ -576,10 +576,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     async function init() {
         await loadCamerasFromDB();
-        const defaultPeriodRadio = document.querySelector('input[name="period"][value="30days"]');
-        if (defaultPeriodRadio) defaultPeriodRadio.checked = true;
-        toggleCustomDateRange();
-        updateFiltersState();
+
         loadCharts(filtersState);
     }
     init();
