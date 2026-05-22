@@ -36,102 +36,76 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function loadCharts(filters) {
         try {
-            const typesResponse = await fetch(
-                buildApiUrl('/api/stats/types', filters)
-            );
+
+            const typesResponse = await fetch(buildApiUrl('/api/stats/types', filters));
             const typesData = await typesResponse.json();
 
             const ctxTypes = document.getElementById('chart-types').getContext('2d');
-
             if (window.typesChart) window.typesChart.destroy();
-            const gradientColors = [
-                '#E677FF',
-                '#7C79FC',
-                '#7DCFFF'
-            ];
-            window.typesChart = new Chart(ctxTypes, {
-                type: 'pie',
-                data: {
-                    labels: typesData.map(i => i.type),
-                    datasets: [{
-                        data: typesData.map(i => i.count),
-                        backgroundColor: gradientColors,
-                        borderColor: 'transparent'
-                    }]
-                },
-                options: {
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                color: '#ffffff',
-                                font: {
-                                    size: 12
-                                }
+
+            if (!typesData || typesData.length === 0) {
+                showNoData('chart-types', 'Нет данных по типам нарушений');
+            } else {
+                hideNoData('chart-types');
+                const gradientColors = ['#E677FF', '#7C79FC', '#7DCFFF'];
+                window.typesChart = new Chart(ctxTypes, {
+                    type: 'pie',
+                    data: {
+                        labels: typesData.map(i => i.type),
+                        datasets: [{
+                            data: typesData.map(i => i.count),
+                            backgroundColor: gradientColors,
+                            borderColor: 'transparent'
+                        }]
+                    },
+                    options: {
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#ffffff', font: { size: 12 } } },
+                            tooltip: {
+                                backgroundColor: '#ffffff',
+                                titleColor: '#111827',
+                                bodyColor: '#111827',
+                                borderColor: '#e5e7eb',
+                                borderWidth: 1
                             }
-                        },
-                        tooltip: {
-                            backgroundColor: '#ffffff',
-                            titleColor: '#111827',
-                            bodyColor: '#111827',
-                            borderColor: '#e5e7eb',
-                            borderWidth: 1
                         }
                     }
-                }
-            });
+                });
+            }
 
-            const dailyResponse = await fetch(
-                buildApiUrl('/api/stats/daily', filters)
-            );
+
+            const dailyResponse = await fetch(buildApiUrl('/api/stats/daily', filters));
             const dailyData = await dailyResponse.json();
 
             const ctxDaily = document.getElementById('chart-daily').getContext('2d');
-
             if (window.dailyChart) window.dailyChart.destroy();
 
-            window.dailyChart = new Chart(ctxDaily, {
-                type: 'line',
-                data: {
-                    labels: dailyData.map(i => i.date),
-                    datasets: [{
-                        label: 'Количество нарушений',
-                        data: dailyData.map(i => i.count),
-                        borderColor: '#7C79FC',
-                        backgroundColor: 'rgba(124, 121, 252, 0.15)',
-                        pointBackgroundColor: '#7DCFFF',
-                        tension: 0.3
-                    }]
-                },
-                options: {
-                    scales: {
-                        x: {
-                            ticks: {
-                                color: '#ffffff'
-                            },
-                            grid: {
-                                color: 'rgba(255,255,255,0.15)'
-                            }
-                        },
-                        y: {
-                            ticks: {
-                                color: '#ffffff'
-                            },
-                            grid: {
-                                color: 'rgba(255,255,255,0.15)'
-                            }
-                        }
+            if (!dailyData || dailyData.length === 0) {
+                showNoData('chart-daily', 'Нет данных по динамике нарушений');
+            } else {
+                hideNoData('chart-daily');
+                window.dailyChart = new Chart(ctxDaily, {
+                    type: 'line',
+                    data: {
+                        labels: dailyData.map(i => i.date),
+                        datasets: [{
+                            label: 'Количество нарушений',
+                            data: dailyData.map(i => i.count),
+                            borderColor: '#7C79FC',
+                            backgroundColor: 'rgba(124, 121, 252, 0.15)',
+                            pointBackgroundColor: '#7DCFFF',
+                            tension: 0.3
+                        }]
                     },
-                    plugins: {
-                        legend: {
-                            labels: {
-                                color: '#ffffff'
-                            }
-                        }
+                    options: {
+                        scales: {
+                            x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.15)' } },
+                            y: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.15)' } }
+                        },
+                        plugins: { legend: { labels: { color: '#ffffff' } } }
                     }
-
-                }
-            });
+                });
+            }
 
         } catch (e) {
             console.error(e);
@@ -529,8 +503,43 @@ document.addEventListener('DOMContentLoaded', function() {
                 `/export/${format}?${params.toString()}`;
         });
     }
+    function showNoData(canvasId, message) {
+        const canvas = document.getElementById(canvasId);
+        const parent = canvas.parentElement;
 
+        let noDataDiv = parent.querySelector('.no-data-message');
+        if (noDataDiv) noDataDiv.remove();
+
+        noDataDiv = document.createElement('div');
+        noDataDiv.className = 'no-data-message';
+        noDataDiv.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #888;
+            font-size: 18px;
+            font-weight: 500;
+            text-align: center;
+            pointer-events: none;
+        `;
+        noDataDiv.textContent = message;
+
+        parent.style.position = 'relative';
+        parent.appendChild(noDataDiv);
+        canvas.style.display = 'none';
+    }
+
+    function hideNoData(canvasId) {
+        const canvas = document.getElementById(canvasId);
+        const parent = canvas.parentElement;
+        const noDataDiv = parent.querySelector('.no-data-message');
+        if (noDataDiv) noDataDiv.remove();
+        canvas.style.display = 'block';
+    }
 });
+
+
 
 
 
