@@ -275,6 +275,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (applyBtn) {
         applyBtn.addEventListener('click', function () {
             updateFiltersState();
+            saveAnalyticsFilters();
             loadCharts(filtersState);
         });
     }
@@ -579,7 +580,56 @@ document.addEventListener('DOMContentLoaded', function () {
 
         loadCharts(filtersState);
     }
+
+    function saveAnalyticsFilters() {
+        const period = document.querySelector('input[name="period"]:checked')?.value || '30days';
+        const grouping = document.querySelector('input[name="grouping"]:checked')?.value || 'day';
+        const dateFrom = document.getElementById('date-from')?.value || '';
+        const dateTo = document.getElementById('date-to')?.value || '';
+        const otherChecked = document.getElementById('other-cameras-checkbox')?.checked || false;
+
+        const selectedCameras = Array.from(document.querySelectorAll('#camera-dropdown input[type="checkbox"]'))
+            .filter(cb => cb.checked && cb.id !== 'other-cameras-checkbox')
+            .map(cb => cb.value);
+
+        const state = {
+            period: period,
+            grouping: grouping,
+            date_from: dateFrom,
+            date_to: dateTo,
+            other_cameras: otherChecked,
+            cameras: selectedCameras
+        };
+
+        localStorage.setItem('analyticsFilters', JSON.stringify(state));
+    }
+    function restoreAnalyticsFilters() {
+        const saved = localStorage.getItem('analyticsFilters');
+        if (!saved) return;
+        const state = JSON.parse(saved);
+
+        const periodRadio = document.querySelector(`input[name="period"][value="${state.period}"]`);
+        if (periodRadio) periodRadio.checked = true;
+
+        const groupingRadio = document.querySelector(`input[name="grouping"][value="${state.grouping}"]`);
+        if (groupingRadio) groupingRadio.checked = true;
+
+        if (state.date_from) document.getElementById('date-from').value = state.date_from;
+        if (state.date_to) document.getElementById('date-to').value = state.date_to;
+
+        const otherCheckbox = document.getElementById('other-cameras-checkbox');
+        if (otherCheckbox) otherCheckbox.checked = state.other_cameras;
+
+        document.querySelectorAll('#camera-dropdown input[type="checkbox"]').forEach(cb => {
+            if (cb.id !== 'other-cameras-checkbox') {
+                cb.checked = state.cameras.includes(cb.value);
+            }
+        });
+    }
+    restoreAnalyticsFilters();
+    window.addEventListener('beforeunload', saveAnalyticsFilters);
     init();
+
 });
 
 
