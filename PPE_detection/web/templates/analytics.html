@@ -22,32 +22,32 @@
         </div>
 
         <div class="section-spacer"></div>
-            <div class="filters-section">
-                <div class="filters-area" id="filters-area">
+        <div class="filters-section">
+            <div class="filters-area" id="filters-area">
 
-                    <div class="section-title">
-                        Настройки графиков
+                <div class="section-title">
+                    Настройки графиков
+                </div>
+                <div class="filter-group filter-group-row">
+                    <label>Период:</label>
+                    <div class="period-buttons">
+                        <label class="radio-label">
+                            <input type="radio" name="period" value="7days"> 7 дней
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="period" value="30days"> 30 дней
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="period" value="3months"> 3 мес
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="period" value="year"> Год
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="period" value="custom" id="custom-period-radio"> Другое
+                        </label>
                     </div>
-                    <div class="filter-group filter-group-row">
-                        <label>Период:</label>
-                        <div class="period-buttons">
-                            <label class="radio-label">
-                                <input type="radio" name="period" value="7days"> 7 дней
-                            </label>
-                            <label class="radio-label">
-                                <input type="radio" name="period" value="30days"> 30 дней
-                            </label>
-                            <label class="radio-label">
-                                <input type="radio" name="period" value="3months"> 3 мес
-                            </label>
-                            <label class="radio-label">
-                                <input type="radio" name="period" value="year"> Год
-                            </label>
-                            <label class="radio-label">
-                                <input type="radio" name="period" value="custom" id="custom-period-radio"> Другое
-                            </label>
-                        </div>
-                    </div>
+                </div>
 
                     <div class="filter-group filter-group-row" id="custom-date-range" style="display: none;">
                         <label>Свой период:</label>
@@ -58,69 +58,64 @@
                         </div>
                     </div>
 
-                    <div class="filter-group filter-group-row">
-                        <label>Группировка:</label>
+                <div class="filter-group filter-group-row">
+                    <label>Группировка:</label>
 
-                        <div class="period-buttons">
+                    <div class="period-buttons">
 
-                            <label class="radio-label">
-                                <input type="radio" name="grouping" value="day" checked>
-                                Дни
-                            </label>
+                        <label class="radio-label">
+                            <input type="radio" name="grouping" value="day" checked>
+                            Дни
+                        </label>
 
-                            <label class="radio-label">
-                                <input type="radio" name="grouping" value="week">
-                                Недели
-                            </label>
+                        <label class="radio-label">
+                            <input type="radio" name="grouping" value="week">
+                            Недели
+                        </label>
 
-                            <label class="radio-label">
-                                <input type="radio" name="grouping" value="month">
-                                Месяцы
-                            </label>
+                        <label class="radio-label">
+                            <input type="radio" name="grouping" value="month">
+                            Месяцы
+                        </label>
 
-                            <label class="radio-label">
-                                <input type="radio" name="grouping" value="year">
-                                Годы
-                            </label>
+                        <label class="radio-label">
+                            <input type="radio" name="grouping" value="year">
+                            Годы
+                        </label>
 
-                        </div>
-                    </div>
-
-
-                    <div class="filter-group camera-selector">
-                        <label>По камере:</label>
-                        <div class="dropdown-checkbox">
-                            <button type="button" class="dropdown-btn" id="camera-dropdown-btn">
-                                Выбрать камеры <span class="arrow">▼</span>
-                            </button>
-                            <div class="dropdown-content" id="camera-dropdown">
-                                <label><input type="checkbox" value="rtsp://localhost:8554/stream1" checked> rtsp://localhost:8554/stream1</label>
-                                <label><input type="checkbox" value="rtsp://localhost:8554/stream2" checked> rtsp://localhost:8554/stream2</label>
-                                <label><input type="checkbox" value="rtsp://localhost:8554/stream3" checked> rtsp://localhost:8554/stream3</label>
-                                <label><input type="checkbox" value="rtsp://localhost:8554/stream4" checked> rtsp://localhost:8554/stream4</label>
-
-                                <label><input type="checkbox" value="other" checked id="other-cameras-checkbox"> Другое (веб-камера, видео и т.д.)</label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="filter-buttons">
-                        <button id="apply-filters-analytics" class="btn-primary">Применить</button>
                     </div>
                 </div>
+
+
+                <div class="filter-group camera-selector">
+                    <label>По камере:</label>
+                    <div class="dropdown-checkbox">
+                        <button type="button" class="dropdown-btn" id="camera-dropdown-btn">
+                            Выбрать камеры <span class="arrow">▼</span>
+                        </button>
+                        <div class="dropdown-content" id="camera-dropdown">
+                            <div id="camera-list-loading">Загрузка камер...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="filter-buttons">
+                    <button id="apply-filters-analytics" class="btn-primary">Применить</button>
+                </div>
             </div>
-
-            <div class="section-spacer"></div>
-
-            <div class="export-section">
-    <div class="filters-area export-area">
-
-        <div class="section-title">
-            Экспорт
         </div>
 
-        <div class="filter-group filter-group-row">
-            <label>Формат:</label>
+        <div class="section-spacer"></div>
+
+        <div class="export-section">
+            <div class="filters-area export-area">
+
+                <div class="section-title">
+                    Экспорт
+                </div>
+
+                <div class="filter-group filter-group-row">
+                    <label>Формат:</label>
 
             <div class="period-buttons">
                 <label class="radio-label">
@@ -218,5 +213,4 @@
 
 
 {% endblock %}
-
 

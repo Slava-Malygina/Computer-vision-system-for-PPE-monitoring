@@ -3,18 +3,54 @@ from pathlib import Path
 import os
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from datetime import datetime, timedelta
-from flask import jsonify, send_from_directory
+from flask import Flask, request, render_template, url_for, redirect, jsonify, send_from_directory, send_file, after_this_request, Response
 import io
 import tempfile
-from flask import send_file, after_this_request
+import yaml
 from modules.utils.export_log import export_to_xlsx, export_to_pdf
-from flask import Flask, request, render_template, url_for, redirect
 from modules.database.sqlite_logger import SQLiteLogger
 
 DB_PATH = Path(__file__).parent.parent / "logs" / "violations.db"
-
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 logger = SQLiteLogger(db_path=str(DB_PATH))
+
+def load_auth_config():
+    config_path = Path(__file__).parent.parent / "config" / "config.yaml"
+    if not config_path.exists():
+        return None
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        return config.get('web_auth')
+    except Exception as e:
+        print(f"Ошибка загрузки auth конфига: {e}")
+        return None
+
+AUTH_CONFIG = load_auth_config()
+
+def check_auth(username, password):
+    if not AUTH_CONFIG:
+        return True
+    return (username == AUTH_CONFIG.get('login') and 
+            password == AUTH_CONFIG.get('password'))
+
+def authenticate():
+    return Response(
+        'Unauthorized access',
+        401,
+        {'WWW-Authenticate': 'Basic realm="PPE Monitor"'}
+    )
+
+@app.before_request
+def before_request_callback():
+    if request.endpoint == 'static' or request.path.startswith('/static/'):
+        return
+    if not AUTH_CONFIG:
+        return
+    auth = request.authorization
+    if not auth or not check_auth(auth.username, auth.password):
+        return authenticate()
+
 
 def _apply_common_filters(query, params, filters):
     if filters.get('camera_id'):
@@ -164,6 +200,11 @@ def _parse_export_filters():
         'sort_order': sort_order,
         'limit': limit
     }
+
+@app.route('/api/cameras')
+def api_cameras():
+    cameras = get_unique_camera_ids()
+    return jsonify(cameras)
 
 @app.route('/export/csv')
 def export_csv():

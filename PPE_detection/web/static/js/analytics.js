@@ -1,43 +1,100 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     console.log("DOM готов");
 
+    let allCameras = [];
     let filtersState = {
         start_date: null,
         end_date: null,
-        cameras: [],
+        cameras: null,
         grouping: 'day'
     };
+
+    async function loadCamerasFromDB() {
+        try {
+            const response = await fetch('/api/cameras');
+            const cameras = await response.json();
+            allCameras = cameras;
+            const container = document.getElementById('camera-dropdown');
+            if (!container) return;
+            container.innerHTML = '';
+            if (cameras.length === 0) {
+                container.innerHTML = '<div class="no-data">Нет данных о камерах</div>';
+                return;
+            }
+            cameras.forEach(cam => {
+                const label = document.createElement('label');
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = cam;
+                cb.checked = true;
+                label.appendChild(cb);
+                label.appendChild(document.createTextNode(' ' + cam));
+                container.appendChild(label);
+            });
+        } catch (e) {
+            console.error('Ошибка загрузки камер:', e);
+        }
+    }
+
+    function getSelectedCameras() {
+        const checkboxes = document.querySelectorAll('#camera-dropdown input[type="checkbox"]');
+        const selected = Array.from(checkboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+        return selected.length === 0 ? null : selected;
+    }
+
+    function getSelectedPeriod() {
+        const selected = document.querySelector('input[name="period"]:checked')?.value;
+        const today = new Date();
+        let start = null;
+        let end = today.toISOString().split('T')[0];
+
+        if (selected === '7days') {
+            const d = new Date();
+            d.setDate(d.getDate() - 7);
+            start = d.toISOString().split('T')[0];
+        } else if (selected === '30days') {
+            const d = new Date();
+            d.setDate(d.getDate() - 30);
+            start = d.toISOString().split('T')[0];
+        } else if (selected === '3months') {
+            const d = new Date();
+            d.setMonth(d.getMonth() - 3);
+            start = d.toISOString().split('T')[0];
+        } else if (selected === 'year') {
+            const d = new Date();
+            d.setFullYear(d.getFullYear() - 1);
+            start = d.toISOString().split('T')[0];
+        } else if (selected === 'custom') {
+            start = document.getElementById('date-from')?.value || null;
+            end = document.getElementById('date-to')?.value || null;
+        }
+        return { start, end };
+    }
+
+    function getSelectedGrouping() {
+        return document.querySelector('input[name="grouping"]:checked')?.value || 'day';
+    }
 
     function buildApiUrl(baseUrl, filters) {
         let url = baseUrl;
         const params = new URLSearchParams();
-
-        if (filters.cameras?.length) {
-            filters.cameras.forEach(c =>
-                params.append('camera_id', c)
-            );
+        if (filters.cameras && filters.cameras.length) {
+            filters.cameras.forEach(c => params.append('camera_id', c));
         }
-
-        if (filters.start_date) {
-            params.append('start_date', filters.start_date);
-        }
-
-        if (filters.end_date) {
-            params.append('end_date', filters.end_date);
-        }
-        if (filters.grouping) {
-            params.append('grouping', filters.grouping);
-        }
+        if (filters.start_date) params.append('start_date', filters.start_date);
+        if (filters.end_date) params.append('end_date', filters.end_date);
+        if (filters.grouping) params.append('grouping', filters.grouping);
         const query = params.toString();
         if (query) url += '?' + query;
-
         return url;
     }
 
     async function loadCharts(filters) {
         try {
-
-            const typesResponse = await fetch(buildApiUrl('/api/stats/types', filters));
+            const typesUrl = buildApiUrl('/api/stats/types', filters);
+            const typesResponse = await fetch(typesUrl);
             const typesData = await typesResponse.json();
 
             const ctxTypes = document.getElementById('chart-types').getContext('2d');
@@ -73,8 +130,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
 
-
-            const dailyResponse = await fetch(buildApiUrl('/api/stats/daily', filters));
+            const dailyUrl = buildApiUrl('/api/stats/daily', filters);
+            const dailyResponse = await fetch(dailyUrl);
             const dailyData = await dailyResponse.json();
 
             const ctxDaily = document.getElementById('chart-daily').getContext('2d');
@@ -183,13 +240,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateFiltersState() {
         const period = getSelectedPeriod();
-        const cameras = getSelectedCameras();
-
         filtersState.start_date = period.start;
         filtersState.end_date = period.end;
-        filtersState.cameras = cameras;
+        filtersState.cameras = getSelectedCameras();
         filtersState.grouping = getSelectedGrouping();
-
         console.log("STATE:", filtersState);
     }
     const refreshBtn = document.getElementById('refresh-stats');
@@ -217,62 +271,45 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (lineBtn) {
-        lineBtn.addEventListener('click', function() {
-            console.log("Линейная диаграмма");
+    const applyBtn = document.getElementById('apply-filters-analytics');
+    if (applyBtn) {
+        applyBtn.addEventListener('click', function () {
+            updateFiltersState();
+            loadCharts(filtersState);
         });
     }
-
 
     const customRadio = document.getElementById('custom-period-radio');
     const customDateRange = document.getElementById('custom-date-range');
-
     function toggleCustomDateRange() {
-        if (!customDateRange) return;
-
         if (customRadio && customRadio.checked) {
             customDateRange.style.display = 'flex';
-            console.log('Поля даты показаны');
         } else {
             customDateRange.style.display = 'none';
-            console.log('Поля даты скрыты');
         }
     }
-
     if (customRadio) {
-
         customRadio.addEventListener('change', toggleCustomDateRange);
-
-        const allPeriodRadios = document.querySelectorAll('input[name="period"]');
-        allPeriodRadios.forEach(radio => {
-            radio.addEventListener('change', function() {
-
-                setTimeout(toggleCustomDateRange, 10);
-            });
+        document.querySelectorAll('input[name="period"]').forEach(radio => {
+            radio.addEventListener('change', () => setTimeout(toggleCustomDateRange, 10));
         });
-
         toggleCustomDateRange();
     }
+
     const cameraDropdownBtn = document.getElementById('camera-dropdown-btn');
     const cameraDropdown = document.getElementById('camera-dropdown');
     const cameraArrow = cameraDropdownBtn?.querySelector('.arrow');
-
     if (cameraDropdownBtn) {
-        cameraDropdownBtn.addEventListener('click', function(e) {
+        cameraDropdownBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-
             cameraDropdown.classList.toggle('show');
             cameraArrow?.classList.toggle('rotated');
         });
     }
-
     if (cameraDropdown) {
-        cameraDropdown.addEventListener('click', function(e) {
-            e.stopPropagation();
-        });
+        cameraDropdown.addEventListener('click', (e) => e.stopPropagation());
     }
-
-    document.addEventListener('click', function() {
+    document.addEventListener('click', () => {
         cameraDropdown?.classList.remove('show');
         cameraArrow?.classList.remove('rotated');
     });
@@ -537,9 +574,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (noDataDiv) noDataDiv.remove();
         canvas.style.display = 'block';
     }
+    async function init() {
+        await loadCamerasFromDB();
+        const defaultPeriodRadio = document.querySelector('input[name="period"][value="30days"]');
+        if (defaultPeriodRadio) defaultPeriodRadio.checked = true;
+        toggleCustomDateRange();
+        updateFiltersState();
+        loadCharts(filtersState);
+    }
+    init();
 });
-
-
 
 
 
