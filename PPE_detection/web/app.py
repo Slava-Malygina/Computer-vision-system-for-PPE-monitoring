@@ -9,6 +9,7 @@ import tempfile
 import yaml
 from modules.utils.export_log import export_to_xlsx, export_to_pdf
 from modules.database.sqlite_logger import SQLiteLogger
+from flask import abort, render_template_string
 
 DB_PATH = Path(__file__).parent.parent / "logs" / "violations.db"
 app = Flask(__name__, static_folder='static', static_url_path='/static')
@@ -281,6 +282,7 @@ def stats_types():
     cursor.execute(query, params)
     rows = cursor.fetchall()
 
+    total = sum(row['count'] for row in rows)
     type_names = {
         'no_helmet': 'Без каски',
         'no_vest': 'Без жилета',
@@ -288,9 +290,12 @@ def stats_types():
     }
     result = []
     for row in rows:
+        count = row['count']
+        percentage = (count / total * 100) if total > 0 else 0
         result.append({
             'type': type_names.get(row['violation_type'], row['violation_type']),
-            'count': row['count']
+            'count': count,
+            'percentage': round(percentage, 2)
         })
     return jsonify(result)
 
@@ -319,26 +324,31 @@ def stats_daily():
         date_expr = "date"
 
     query = f"""
-        SELECT {date_expr} as period, COUNT(*) as count
+        SELECT 
+            {date_expr} as period,
+            SUM(CASE WHEN violation_type = 'no_helmet' THEN 1 ELSE 0 END) as no_helmet,
+            SUM(CASE WHEN violation_type = 'no_vest' THEN 1 ELSE 0 END) as no_vest,
+            SUM(CASE WHEN violation_type = 'no_gloves' THEN 1 ELSE 0 END) as no_gloves
         FROM violations
         WHERE 1=1
     """
     params = []
     query, params = _apply_common_filters(query, params, filters)
-    query += f" GROUP BY {date_expr} ORDER BY {date_expr} ASC"
+    query += f" GROUP BY {date_expr} ORDER BY period ASC"
 
     conn = logger.connection
     cursor = conn.cursor()
     cursor.execute(query, params)
     rows = cursor.fetchall()
 
-    result = [
-        {
-            'date': row['period'],
-            'count': row['count']
-        }
-        for row in rows
-    ]
+    result = []
+    for row in rows:
+        result.append({
+            'period': row['period'],
+            'no_helmet': row['no_helmet'],
+            'no_vest': row['no_vest'],
+            'no_gloves': row['no_gloves']
+        })
     return jsonify(result)
 
 
@@ -423,9 +433,24 @@ def journal():
         active_tab='journal'
     )
 
+
 @app.route('/violations/<path:filename>')
 def serve_violation(filename):
     violations_dir = Path(__file__).parent.parent / "violations"
+    full_path = violations_dir / filename
+    if not full_path.exists() or not full_path.is_file():
+        return render_template_string('''
+            <!DOCTYPE html>
+            <html>
+            <head><title>Скриншот не найден</title></head>
+            <body style="font-family: Arial; text-align: center; margin-top: 50px;">
+                <h2>Скриншот не найден</h2>
+                <p>Файл <code>{{ filename }}</code> отсутствует в папке violations.</p>
+                <p>Проверьте корректность пути или создайте скриншот заново.</p>
+                <a href="/journal">Вернуться в журнал</a>
+            </body>
+            </html>
+        ''', filename=filename), 404
     return send_from_directory(violations_dir, filename)
 
 
