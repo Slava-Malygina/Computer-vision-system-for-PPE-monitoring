@@ -1,5 +1,6 @@
+const OTHER_CAMERA_VALUES = [];
 document.addEventListener('DOMContentLoaded', function () {
-    console.log("DOM готов, инициализация аналитики");
+    console.log("DOM готов");
 
     let allCameras = [];
     let filtersState = {
@@ -34,7 +35,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 const cb = document.createElement('input');
                 cb.type = 'checkbox';
                 cb.value = cam;
-                cb.checked = true;
+                cb.checked = filtersState.cameras === null
+                            ? true
+                            : filtersState.cameras.includes(cam);
                 label.appendChild(cb);
                 label.appendChild(document.createTextNode(' ' + cam));
                 container.appendChild(label);
@@ -116,33 +119,38 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             const ctx = ctxTypes.getContext('2d');
             if (window.typesChart) window.typesChart.destroy();
-            window.typesChart = new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    labels: typesData.map(i => i.type),
-                    datasets: [{
-                        data: typesData.map(i => i.count),
-                        backgroundColor: ['#E677FF', '#7C79FC', '#7DCFFF'],
-                        borderColor: 'transparent'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: (ctx) => {
-                                    const value = ctx.raw;
-                                    const percentage = typesData[ctx.dataIndex].percentage;
-                                    return `${ctx.label}: ${value} (${percentage}%)`;
+            if (!typesData || typesData.length === 0) {
+                showNoData('chart-types', 'Нет данных по типам нарушений');
+            } else {
+                hideNoData('chart-types');
+                window.typesChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: typesData.map(i => i.type),
+                        datasets: [{
+                            data: typesData.map(i => i.count),
+                            backgroundColor: ['#E677FF', '#7C79FC', '#7DCFFF'],
+                            borderColor: 'transparent'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: (ctx) => {
+                                        const value = ctx.raw;
+                                        const percentage = typesData[ctx.dataIndex].percentage;
+                                        return `${ctx.label}: ${value} (${percentage}%)`;
+                                    }
                                 }
-                            }
-                        },
-                        legend: { position: 'bottom', labels: { color: '#ffffff' } }
+                            },
+                            legend: { position: 'bottom', labels: { color: '#ffffff' } }
+                        }
                     }
-                }
-            });
+                });
+            }
             console.log("Круговая диаграмма отрисована");
 
             const dailyUrl = buildApiUrl('/api/stats/daily', filters);
@@ -161,31 +169,36 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             const ctxDaily2d = ctxDaily.getContext('2d');
             if (window.dailyChart) window.dailyChart.destroy();
-            window.dailyChart = new Chart(ctxDaily2d, {
-                type: 'line',
-                data: {
-                    labels: dates,
-                    datasets: [{
-                        label: 'Количество нарушений',
-                        data: totalCounts,
-                        borderColor: '#7C79FC',
-                        backgroundColor: 'rgba(124, 121, 252, 0.15)',
-                        pointBackgroundColor: '#7DCFFF',
-                        tension: 0.3,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    scales: {
-                        x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.15)' } },
-                        y: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.15)' }, beginAtZero: true }
+            if (!dailyData || dailyData.length === 0) {
+                showNoData('chart-daily', 'Нет данных по динамике нарушений');
+            } else {
+                hideNoData('chart-daily');
+                window.dailyChart = new Chart(ctxDaily2d, {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: [{
+                            label: 'Количество нарушений',
+                            data: totalCounts,
+                            borderColor: '#7C79FC',
+                            backgroundColor: 'rgba(124, 121, 252, 0.15)',
+                            pointBackgroundColor: '#7DCFFF',
+                            tension: 0.3,
+                            fill: true
+                        }]
                     },
-                    plugins: { legend: { labels: { color: '#ffffff' } } }
-                }
-            });
-            console.log("Линейная диаграмма отрисована");
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        scales: {
+                            x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.15)' } },
+                            y: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.15)' }, beginAtZero: true }
+                        },
+                        plugins: { legend: { labels: { color: '#ffffff' } } }
+                    }
+                });
+                console.log("Линейная диаграмма отрисована");
+            }
         } catch (e) {
             console.error("Ошибка при загрузке диаграмм:", e);
         }
@@ -204,6 +217,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (applyBtn) {
         applyBtn.addEventListener('click', function () {
             updateFiltersState();
+            saveAnalyticsFilters();
             loadCharts(filtersState);
         });
     }
@@ -243,6 +257,179 @@ document.addEventListener('DOMContentLoaded', function () {
         cameraArrow?.classList.remove('rotated');
     });
 
+
+    function updateOtherCheckboxState() {
+        const otherCheckbox = document.getElementById('other-cameras-checkbox');
+        if (!otherCheckbox) return;
+
+        const otherCameras = Array.from(document.querySelectorAll('#camera-dropdown input'))
+            .filter(cb => OTHER_CAMERA_VALUES.includes(cb.value));
+
+        const allChecked = otherCameras.length > 0 && otherCameras.every(cb => cb.checked);
+        otherCheckbox.checked = allChecked;
+    }
+
+    const otherCheckbox = document.getElementById('other-cameras-checkbox');
+    if (otherCheckbox) {
+        otherCheckbox.addEventListener('change', function(e) {
+            const isChecked = e.target.checked;
+            const otherCameras = Array.from(document.querySelectorAll('#camera-dropdown input'))
+                .filter(cb => OTHER_CAMERA_VALUES.includes(cb.value));
+            otherCameras.forEach(cb => cb.checked = isChecked);
+        });
+    }
+
+    document.querySelectorAll('#camera-dropdown input').forEach(cb => {
+        if (OTHER_CAMERA_VALUES.includes(cb.value)) {
+            cb.addEventListener('change', updateOtherCheckboxState);
+        }
+    });
+
+
+    const applyJournalFiltersCheckbox = document.getElementById('apply-journal-filters-checkbox');
+    const activeFiltersBox = document.getElementById('active-filters-box');
+    const activeFiltersList = document.getElementById('active-filters-list');
+
+    function getJournalFilters() {
+        const params = new URLSearchParams(localStorage.getItem('journalFilters') || '');
+
+        return {
+            cameras: params.getAll('camera_id'),
+            violations: params.getAll('violation_type'),
+            dateFrom: params.get('date_from'),
+            dateTo: params.get('date_to'),
+            timeFrom: params.get('time_from'),
+            timeTo: params.get('time_to'),
+            minConfidence: params.get('min_confidence'),
+            maxConfidence: params.get('max_confidence'),
+            sortBy: params.get('sort_by'),
+            sortOrder: params.get('sort_order')
+        };
+    }
+
+    function renderActiveFilters() {
+
+        const filters = getJournalFilters();
+
+        const violationNames = {
+            no_helmet: 'Без каски',
+            no_vest: 'Без жилета',
+            no_gloves: 'Без перчаток'
+        };
+
+        const sortNames = {
+            date: 'Дата',
+            time: 'Время',
+            confidence: 'Вероятность'
+        };
+
+        const sortOrderNames = {
+            ASC: 'По возрастанию',
+            DESC: 'По убыванию'
+        };
+
+        activeFiltersList.innerHTML = `
+            <div class="filter-info-item">
+                <span class="filter-info-label">Период:</span>
+                <span class="filter-info-value">
+                    ${filters.dateFrom || '—'} — ${filters.dateTo || '—'}
+                </span>
+            </div>
+
+            <div class="filter-info-item">
+                <span class="filter-info-label">Время:</span>
+                <span class="filter-info-value">
+                    ${filters.timeFrom || '—'} — ${filters.timeTo || '—'}
+                </span>
+            </div>
+
+            <div class="filter-info-item">
+                <span class="filter-info-label">Камеры:</span>
+                <span class="filter-info-value">
+                    ${filters.cameras.length ? filters.cameras.join(', ') : 'Все'}
+                </span>
+            </div>
+
+            <div class="filter-info-item">
+                <span class="filter-info-label">Нарушения:</span>
+                <span class="filter-info-value">
+                    ${
+                        filters.violations.length
+                        ? filters.violations.map(v => violationNames[v] || v).join(', ')
+                        : 'Все'
+                    }
+                </span>
+            </div>
+
+            <div class="filter-info-item">
+                <span class="filter-info-label">Вероятность:</span>
+                <span class="filter-info-value">
+                    ${filters.minConfidence || 0}% — ${filters.maxConfidence || 100}%
+                </span>
+            </div>
+
+            <div class="filter-info-item">
+                <span class="filter-info-label">Сортировка:</span>
+                <span class="filter-info-value">
+                    ${sortNames[filters.sortBy] || 'Дата'} •
+                    ${sortOrderNames[filters.sortOrder] || 'По убыванию'}
+                </span>
+            </div>
+        `;
+    }
+
+
+    applyJournalFiltersCheckbox?.addEventListener('change', () => {
+
+        if (applyJournalFiltersCheckbox.checked) {
+
+            activeFiltersBox.style.display = 'block';
+            renderActiveFilters();
+
+        } else {
+
+            activeFiltersBox.style.display = 'none';
+        }
+    });
+
+    const fullReportCheckbox = document.getElementById('full-report-checkbox');
+
+    const recordsLimitWrapper = document.getElementById('records-limit-wrapper');
+
+    function updateRecordsLimitVisibility() {
+
+        if (fullReportCheckbox.checked) {
+
+            recordsLimitWrapper.style.display = 'none';
+
+        } else {
+
+            recordsLimitWrapper.style.display = 'flex';
+        }
+    }
+
+    fullReportCheckbox?.addEventListener(
+        'change',
+        updateRecordsLimitVisibility
+    );
+
+    updateRecordsLimitVisibility();
+
+
+    const recordsInput = document.getElementById('records-limit-input');
+
+    document.getElementById('records-up-btn')?.addEventListener('click', () => {
+
+        recordsInput.stepUp();
+    });
+
+    document.getElementById('records-down-btn')?.addEventListener('click', () => {
+
+        recordsInput.stepDown();
+    });
+
+
+
     const downloadBtn = document.getElementById('download-report-btn');
     if (downloadBtn) {
         downloadBtn.addEventListener('click', () => {
@@ -264,15 +451,101 @@ document.addEventListener('DOMContentLoaded', function () {
             window.location.href = `/export/${format}?${params.toString()}`;
         });
     }
+    function showNoData(canvasId, message) {
+        const canvas = document.getElementById(canvasId);
+        const parent = canvas.parentElement;
 
+        let noDataDiv = parent.querySelector('.no-data-message');
+        if (noDataDiv) noDataDiv.remove();
+
+        noDataDiv = document.createElement('div');
+        noDataDiv.className = 'no-data-message';
+        noDataDiv.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #888;
+            font-size: 18px;
+            font-weight: 500;
+            text-align: center;
+            pointer-events: none;
+        `;
+        noDataDiv.textContent = message;
+
+        parent.style.position = 'relative';
+        parent.appendChild(noDataDiv);
+        canvas.style.display = 'none';
+    }
+
+    function hideNoData(canvasId) {
+        const canvas = document.getElementById(canvasId);
+        const parent = canvas.parentElement;
+        const noDataDiv = parent.querySelector('.no-data-message');
+        if (noDataDiv) noDataDiv.remove();
+        canvas.style.display = 'block';
+    }
     async function init() {
-        console.log("Инициализация страницы аналитики");
+        restoreAnalyticsFilters();
         await loadCamerasFromDB();
-        const defaultPeriodRadio = document.querySelector('input[name="period"][value="30days"]');
-        if (defaultPeriodRadio) defaultPeriodRadio.checked = true;
-        toggleCustomDateRange();
-        updateFiltersState();
         loadCharts(filtersState);
     }
+
+    function saveAnalyticsFilters() {
+        const period = document.querySelector('input[name="period"]:checked')?.value || '30days';
+        const grouping = document.querySelector('input[name="grouping"]:checked')?.value || 'day';
+        const dateFrom = document.getElementById('date-from')?.value || '';
+        const dateTo = document.getElementById('date-to')?.value || '';
+        const otherChecked = document.getElementById('other-cameras-checkbox')?.checked || false;
+
+        const selectedCameras = Array.from(document.querySelectorAll('#camera-dropdown input[type="checkbox"]'))
+            .filter(cb => cb.checked && cb.id !== 'other-cameras-checkbox')
+            .map(cb => cb.value);
+
+        const state = {
+            period: period,
+            grouping: grouping,
+            date_from: dateFrom,
+            date_to: dateTo,
+            other_cameras: otherChecked,
+            cameras: selectedCameras
+        };
+
+        localStorage.setItem('analyticsFilters', JSON.stringify(state));
+    }
+    function restoreAnalyticsFilters() {
+        const saved = localStorage.getItem('analyticsFilters');
+        if (!saved) return;
+        const state = JSON.parse(saved);
+
+        const periodRadio =
+            document.querySelector(
+                `input[name="period"][value="${state.period}"]`
+            );
+
+        if (periodRadio) {
+            periodRadio.checked = true;
+        }
+        const groupingRadio = document.querySelector(`input[name="grouping"][value="${state.grouping}"]`);
+        if (groupingRadio) groupingRadio.checked = true;
+
+        if (state.date_from) document.getElementById('date-from').value = state.date_from;
+        if (state.date_to) document.getElementById('date-to').value = state.date_to;
+
+        const otherCheckbox = document.getElementById('other-cameras-checkbox');
+        if (otherCheckbox) otherCheckbox.checked = state.other_cameras;
+
+        const period = getSelectedPeriod();
+
+        filtersState.start_date = period.start;
+        filtersState.end_date = period.end;
+        filtersState.cameras = state.cameras;
+        filtersState.grouping = state.grouping || 'day';
+    }
+    window.addEventListener('beforeunload', saveAnalyticsFilters);
     init();
+
 });
+
+
+
