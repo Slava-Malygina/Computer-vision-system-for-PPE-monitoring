@@ -28,6 +28,7 @@
                 <div class="section-title">
                     Настройки графиков
                 </div>
+
                 <div class="filter-group filter-group-row">
                     <label>Период:</label>
                     <div class="period-buttons">
@@ -98,6 +99,22 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="filter-group">
+                    <label>Динамика</label>
+                    <label>По нарушению :</label>
+                    <div class="dropdown-checkbox">
+                        <button type="button" class="dropdown-btn" id="violation-dropdown-btn">
+                            Выбрать нарушения <span class="arrow">▼</span>
+                        </button>
+                        <div class="dropdown-content" id="violation-dropdown">
+                            <label><input type="checkbox" value="Без каски" checked> Без каски</label>
+                            <label><input type="checkbox" value="Без жилета" checked> Без жилета</label>
+                            <label><input type="checkbox" value="Без перчаток" checked> Без перчаток</label>
+                        </div>
+                    </div>
+                </div>
+
 
                 <div class="filter-buttons">
                     <button id="apply-filters-analytics" class="btn-primary">Применить</button>

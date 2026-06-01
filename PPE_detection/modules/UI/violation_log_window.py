@@ -384,6 +384,9 @@ class ViolationLogsTab(QWidget):
 
     def open_screenshot(self, screenshot_path):
         viewer = ScreenshotViewer(screenshot_path, self)
+        if hasattr(viewer, "_invalid") and viewer._invalid:
+            return
+
         viewer.exec_()
 
     def on_cell_double_clicked(self, row, column):

@@ -1,7 +1,12 @@
 const OTHER_CAMERA_VALUES = [];
 document.addEventListener('DOMContentLoaded', function () {
     console.log("DOM готов");
-
+    document.querySelectorAll('#violation-dropdown input').forEach(cb => {
+        cb.addEventListener('change', () => {
+            updateFiltersState();
+            loadCharts(filtersState);
+        });
+    });
     let allCameras = [];
     let filtersState = {
         start_date: null,
@@ -167,6 +172,50 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.error("Canvas chart-daily не найден");
                 return;
             }
+            const violationMap = {
+                no_helmet: 'Без каски',
+                no_vest: 'Без жилета',
+                no_gloves: 'Без перчаток'
+            };
+
+            const selectedViolations = Array.from(
+                document.querySelectorAll('#violation-dropdown input:checked')
+            ).map(cb => {
+                const entry = Object.entries(violationMap)
+                    .find(([key, value]) => value === cb.value);
+                return entry ? entry[0] : cb.value;
+            });
+            const datasets = [];
+
+            if (selectedViolations.includes('no_helmet')) {
+                datasets.push({
+                    label: 'Без каски',
+                    data: dailyData.map(i => i.no_helmet),
+                    borderColor: '#E677FF',
+                    backgroundColor: 'transparent',
+                    tension: 0.3
+                });
+            }
+
+            if (selectedViolations.includes('no_vest')) {
+                datasets.push({
+                    label: 'Без жилета',
+                    data: dailyData.map(i => i.no_vest),
+                    borderColor: '#7C79FC',
+                    backgroundColor: 'transparent',
+                    tension: 0.3
+                });
+            }
+
+            if (selectedViolations.includes('no_gloves')) {
+                datasets.push({
+                    label: 'Без перчаток',
+                    data: dailyData.map(i => i.no_gloves),
+                    borderColor: '#7DCFFF',
+                    backgroundColor: 'transparent',
+                    tension: 0.3
+                });
+            }
             const ctxDaily2d = ctxDaily.getContext('2d');
             if (window.dailyChart) window.dailyChart.destroy();
             if (!dailyData || dailyData.length === 0) {
@@ -177,19 +226,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     type: 'line',
                     data: {
                         labels: dates,
-                        datasets: [{
-                            label: 'Количество нарушений',
-                            data: totalCounts,
-                            borderColor: '#7C79FC',
-                            backgroundColor: 'rgba(124, 121, 252, 0.15)',
-                            pointBackgroundColor: '#7DCFFF',
-                            tension: 0.3,
-                            fill: true
-                        }]
+                        datasets: datasets
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: true,
+
                         scales: {
                             x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.15)' } },
                             y: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.15)' }, beginAtZero: true }
@@ -257,6 +298,27 @@ document.addEventListener('DOMContentLoaded', function () {
         cameraArrow?.classList.remove('rotated');
     });
 
+
+    const violationDropdownBtn = document.getElementById('violation-dropdown-btn');
+    const violationDropdown = document.getElementById('violation-dropdown');
+    const violationArrow = violationDropdownBtn?.querySelector('.arrow');
+
+    if (violationDropdownBtn) {
+        violationDropdownBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            violationDropdown.classList.toggle('show');
+            violationArrow?.classList.toggle('rotated');
+        });
+    }
+
+    if (violationDropdown) {
+        violationDropdown.addEventListener('click', (e) => e.stopPropagation());
+    }
+
+    document.addEventListener('click', () => {
+        violationDropdown?.classList.remove('show');
+        violationArrow?.classList.remove('rotated');
+    });
 
     function updateOtherCheckboxState() {
         const otherCheckbox = document.getElementById('other-cameras-checkbox');
@@ -510,6 +572,11 @@ document.addEventListener('DOMContentLoaded', function () {
             other_cameras: otherChecked,
             cameras: selectedCameras
         };
+        const selectedViolations = Array.from(
+            document.querySelectorAll('#violation-dropdown input:checked')
+        ).map(cb => cb.value);
+
+        state.violations = selectedViolations;
 
         localStorage.setItem('analyticsFilters', JSON.stringify(state));
     }
@@ -534,7 +601,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const otherCheckbox = document.getElementById('other-cameras-checkbox');
         if (otherCheckbox) otherCheckbox.checked = state.other_cameras;
-
+        if (state.violations) {
+            document.querySelectorAll('#violation-dropdown input').forEach(cb => {
+                cb.checked = state.violations.includes(cb.value);
+            });
+        }
         const period = getSelectedPeriod();
 
         filtersState.start_date = period.start;

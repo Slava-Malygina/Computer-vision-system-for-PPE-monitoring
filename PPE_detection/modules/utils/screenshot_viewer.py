@@ -8,14 +8,21 @@ class ScreenshotViewer(QDialog):
 
     def __init__(self, image_path, parent=None):
         super().__init__(parent)
+        self.image_path = image_path
+        if not os.path.exists(self.image_path):
+            QMessageBox.warning(
+                parent,
+                "Файл не найден",
+                f"Скриншот не найден:\n{self.image_path}"
+            )
+            self._invalid = True
+            return
+        else:
+            self._invalid = False
         self.scroll_area = QScrollArea()
         self.close_btn = QPushButton("Закрыть")
         self.image_label = QLabel()
-
-        self.setObjectName("screenshotViewer")
-
-        self.image_path = image_path
-        self.setWindowTitle(f"Скриншот нарушения")
+        self.setWindowTitle("Скриншот нарушения")
         self.setMinimumSize(1000, 800)
         self.setup_ui()
         self.load_image()
