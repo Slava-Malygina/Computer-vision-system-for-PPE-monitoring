@@ -36,7 +36,11 @@
                         <td>{{ v.violation_type }}</td>
                         <td>{{ "%.0f"|format(v.confidence * 100) }}%</td>
                         <td>{{ v.camera_id }}</td>
-                        <td><a href="{{ v.screenshot_path }}" target="_blank">{{ v.screenshot_path }}</a></td>
+                        <td>
+                            <a href="/{{ v.screenshot_path }}" target="_blank">
+                                {{ v.screenshot_path }}
+                            </a>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

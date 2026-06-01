@@ -1,6 +1,9 @@
 import sys
 from pathlib import Path
 import os
+
+from modules.utils.path_manager import path_manager
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from datetime import datetime, timedelta
 from flask import Flask, request, render_template, url_for, redirect, jsonify, send_from_directory, send_file, after_this_request, Response
@@ -310,9 +313,11 @@ def stats_daily():
         filters['start_date'] = start_date
         filters['end_date'] = end_date
     elif not filters.get('start_date'):
-        filters['start_date'] = (datetime.strptime(filters['end_date'], '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
+        filters['start_date'] = (datetime.strptime(filters['end_date'],
+                                                   '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
     elif not filters.get('end_date'):
-        filters['end_date'] = (datetime.strptime(filters['start_date'], '%Y-%m-%d') + timedelta(days=30)).strftime('%Y-%m-%d')
+        filters['end_date'] = (datetime.strptime(filters['start_date'],
+                                                 '%Y-%m-%d') + timedelta(days=30)).strftime('%Y-%m-%d')
 
     if grouping == 'week':
         date_expr = "strftime('%Y-W%W', date)"
@@ -322,7 +327,6 @@ def stats_daily():
         date_expr = "strftime('%Y', date)"
     else:
         date_expr = "date"
-
     query = f"""
         SELECT 
             {date_expr} as period,
@@ -414,6 +418,15 @@ def journal():
         **filters
     )
 
+    for v in violations:
+        path = v['screenshot_path']
+
+        # берём всё начиная с violations
+        if 'violations' in path:
+            v['screenshot_path'] = 'violations/' + path.split('violations')[-1].lstrip('\\/')
+        else:
+            v['screenshot_path'] = path.replace('\\', '/')
+
 
     count_filters = {k: v for k, v in filters.items() if k not in ('sort_by', 'sort_order')}
     total = logger.get_violations_count(**count_filters)
@@ -436,24 +449,28 @@ def journal():
 
 @app.route('/violations/<path:filename>')
 def serve_violation(filename):
-    violations_dir = Path(__file__).parent.parent / "violations"
-    full_path = violations_dir / filename
-    if not full_path.exists() or not full_path.is_file():
-        return render_template_string('''
-            <!DOCTYPE html>
-            <html>
-            <head><title>Скриншот не найден</title></head>
-            <body style="font-family: Arial; text-align: center; margin-top: 50px;">
-                <h2>Скриншот не найден</h2>
-                <p>Файл <code>{{ filename }}</code> отсутствует в папке violations.</p>
-                <p>Проверьте корректность пути или создайте скриншот заново.</p>
-                <a href="/journal">Вернуться в журнал</a>
-            </body>
-            </html>
-        ''', filename=filename), 404
-    return send_from_directory(violations_dir, filename)
+    base_dir = Path(path_manager.get_violations_dir())
+    full_path = base_dir / filename
 
+    if not full_path.exists():
+        return render_template_string("""
+        <!DOCTYPE html>
+        <html lang="ru">
+        <head>
+            <meta charset="UTF-8">
+            <title>Файл не найден</title>
+        </head>
+        <body style="font-family: Arial; text-align:center; margin-top:50px;">
+            <h2>Скриншот не найден</h2>
+            <p>Файл:</p>
+            <code>{{ filename }}</code>
+            <p>отсутствует на сервере.</p>
+            <a href="/journal">← Вернуться в журнал</a>
+        </body>
+        </html>
+        """, filename=filename), 404
 
+    return send_from_directory(base_dir, filename)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
