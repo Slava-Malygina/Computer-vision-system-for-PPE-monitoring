@@ -8,19 +8,24 @@
 <div class="analytics-container">
     <div class="glass-panel">
         <div class="charts-section">
-            <div class="charts-grid">
-                <div class="chart-card">
+            <div class="charts-container">
+
+                <div class="chart-card small-chart">
                     <h3>Распределение по типам нарушений</h3>
-                    <canvas id="chart-types"></canvas>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-types"></canvas>
+                    </div>
                 </div>
 
-                <div class="chart-card">
+                <div class="chart-card big-chart">
                     <h3>Динамика нарушений по дням</h3>
-                    <canvas id="chart-daily"></canvas>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-daily"></canvas>
+                    </div>
                 </div>
+
             </div>
         </div>
-
         <div class="section-spacer"></div>
         <div class="filters-section">
             <div class="filters-area" id="filters-area">
@@ -222,12 +227,22 @@
 </div>
     </div>
 </div>
+
+<div id="chart-modal" class="chart-modal">
+    <div class="chart-modal-content">
+        <button id="chart-modal-close">✕</button>
+
+        <div class="chart-modal-body">
+            <canvas id="modal-chart"></canvas>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 
 {% endblock %}
 

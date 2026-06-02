@@ -8,6 +8,11 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
     let allCameras = [];
+    const modal = document.getElementById('chart-modal');
+    const modalCanvas = document.getElementById('modal-chart');
+    const modalClose = document.getElementById('chart-modal-close');
+
+    let modalChart = null;
     let filtersState = {
         start_date: null,
         end_date: null,
@@ -128,33 +133,75 @@ document.addEventListener('DOMContentLoaded', function () {
                 showNoData('chart-types', 'Нет данных по типам нарушений');
             } else {
                 hideNoData('chart-types');
-                window.typesChart = new Chart(ctx, {
-                    type: 'pie',
-                    data: {
-                        labels: typesData.map(i => i.type),
-                        datasets: [{
-                            data: typesData.map(i => i.count),
-                            backgroundColor: ['#E677FF', '#7C79FC', '#7DCFFF'],
-                            borderColor: 'transparent'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: true,
-                        plugins: {
-                            tooltip: {
-                                callbacks: {
-                                    label: (ctx) => {
-                                        const value = ctx.raw;
-                                        const percentage = typesData[ctx.dataIndex].percentage;
-                                        return `${ctx.label}: ${value} (${percentage}%)`;
-                                    }
-                                }
-                            },
-                            legend: { position: 'bottom', labels: { color: '#ffffff' } }
-                        }
+       window.typesChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: typesData.map(i => i.type),
+                datasets: [{
+                    data: typesData.map(i => i.count),
+                    backgroundColor: ['#E677FF', '#7C79FC', '#7DCFFF'],
+                    borderColor: 'transparent'
+                }]
+            },
+            plugins: [ChartDataLabels],
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        top: 40,
+                        left: 0,
+                        right: 0,
+                        bottom: 0
                     }
-                });
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#ffffff',
+                            padding: 20
+                        }
+                    },
+
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const value = ctx.raw;
+                                const total = ctx.chart.data.datasets[0].data.reduce((a,b)=>a+b,0);
+                                const percent = (value / total * 100).toFixed(1);
+                                return `${ctx.label}: ${value} (${percent}%)`;
+                            }
+                        }
+                    },
+
+                    datalabels: {
+                        color: '#ffffff',
+                        font: {
+                            weight: 'bold',
+                            size: 13
+                        },
+
+                        formatter: (value, ctx) => {
+                            const data = ctx.chart.data.datasets[0].data;
+                            const total = data.reduce((a, b) => a + b, 0);
+                            return (value / total * 100).toFixed(1) + '%';
+                        },
+
+                        anchor: 'end',
+                        align: 'end',
+                        offset: 12,
+
+                        clamp: true
+                    }
+                }
+            }
+
+        });
+
+            ctx.canvas.style.cursor = 'pointer';
+
+            ctx.canvas.onclick = () => openChartInModal(window.typesChart);
             }
             console.log("Круговая диаграмма отрисована");
 
@@ -230,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     },
                     options: {
                         responsive: true,
-
+                        maintainAspectRatio: false,
                         scales: {
                             x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.15)' } },
                             y: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.15)' }, beginAtZero: true }
@@ -238,6 +285,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         plugins: { legend: { labels: { color: '#ffffff' } } }
                     }
                 });
+                ctxDaily2d.canvas.style.cursor = 'pointer';
+                ctxDaily2d.canvas.onclick = () => openChartInModal(window.dailyChart);
+
                 console.log("Линейная диаграмма отрисована");
             }
         } catch (e) {
@@ -547,6 +597,44 @@ document.addEventListener('DOMContentLoaded', function () {
         if (noDataDiv) noDataDiv.remove();
         canvas.style.display = 'block';
     }
+
+    function openChartModal(chartInstance) {
+
+    if (!chartInstance) return;
+
+    modal.classList.add('show');
+    document.body.classList.add('modal-open');
+
+    if (modalChart) {
+        modalChart.destroy();
+    }
+
+    const config = structuredClone(chartInstance.config);
+
+    modalChart = new Chart(
+        modalCanvas.getContext('2d'),
+        config
+    );
+}
+
+    function closeChartModal() {
+
+        modal.classList.remove('show');
+        document.body.classList.remove('modal-open');
+
+        if (modalChart) {
+            modalChart.destroy();
+            modalChart = null;
+        }
+    }
+
+    modalClose.addEventListener('click', closeChartModal);
+
+    modal.addEventListener('click', e => {
+        if (e.target === modal) {
+            closeChartModal();
+        }
+    });
     async function init() {
         restoreAnalyticsFilters();
         await loadCamerasFromDB();
@@ -615,6 +703,72 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     window.addEventListener('beforeunload', saveAnalyticsFilters);
     init();
+function openChartInModal(originalChart) {
+    if (!originalChart) return;
+
+    modal.classList.add('show');
+    document.body.classList.add('modal-open');
+
+    if (modalChart) {
+        modalChart.destroy();
+        modalChart = null;
+    }
+    const type = originalChart.config.type;
+
+    setTimeout(() => {
+        const ctx = modalCanvas.getContext('2d');
+
+        const chartData = JSON.parse(JSON.stringify(originalChart.data));
+
+
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: {
+                padding: { top: 40, left: 0, right: 0, bottom: 0 }
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#ffffff', padding: 20 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+
+                        }
+                    }
+                },
+                datalabels: {
+                    color: '#ffffff',
+                    font: { weight: 'bold', size: 12 },
+                    formatter: (value, context) => {
+                        if (originalChart.config.type === "line") return "";
+                        const data = context.chart.data.datasets[0].data;
+                        const total = data.reduce((a, b) => a + b, 0);
+                        return total > 0 ? (value / total * 100).toFixed(1) + '%' : '0%';
+                    },
+                    anchor: 'end',
+                    align: 'end',
+                    offset: 12,
+                    clamp: true
+                }
+            }
+        };
+
+        const newConfig = {
+            type: originalChart.config.type,
+            data: chartData,
+            options: chartOptions,
+            plugins: [ChartDataLabels]
+        };
+
+        modalChart = new Chart(ctx, newConfig);
+
+        setTimeout(() => modalChart.resize(), 100);
+    }, 100);
+}
+
 
 });
 
