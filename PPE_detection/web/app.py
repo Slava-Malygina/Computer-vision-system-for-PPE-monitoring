@@ -451,26 +451,24 @@ def journal():
 def serve_violation(filename):
     base_dir = Path(path_manager.get_violations_dir())
     full_path = base_dir / filename
+    safe_filename = Path(filename).name
 
     if not full_path.exists():
-        return render_template_string("""
-        <!DOCTYPE html>
-        <html lang="ru">
-        <head>
-            <meta charset="UTF-8">
-            <title>Файл не найден</title>
-        </head>
-        <body style="font-family: Arial; text-align:center; margin-top:50px;">
-            <h2>Скриншот не найден</h2>
-            <p>Файл:</p>
-            <code>{{ filename }}</code>
-            <p>отсутствует на сервере.</p>
-            <a href="/journal">← Вернуться в журнал</a>
-        </body>
-        </html>
-        """, filename=filename), 404
+        return render_template('404.html', error_type='screenshot', filename=safe_filename), 404
 
     return send_from_directory(base_dir, filename)
 
+@app.errorhandler(404)
+def page_not_found(e):
+    request_path = request.path
+    if request_path.startswith('/violations/'):
+        filename = request_path.replace('/violations/', '')
+        return render_template('404.html', error_type='screenshot', filename=filename), 404
+    return render_template('404.html', error_type='page'), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return render_template('404.html', error_type='error', error_code=500,
+                           error_message='Внутренняя ошибка сервера'), 500
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
