@@ -1,199 +1,176 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div class="filters-panel">
+    <form method="get" action="{{ url_for('journal') }}" id="filter-form">
+        <div class="filter-group">
+            <label>Камеры:</label>
+            <div class="check-group">
+                {% for cam in all_cameras %}
+                <label>
+                    <input type="checkbox" name="camera_id" value="{{ cam }}" {% if filters.camera_id and cam in filters.camera_id %}checked{% endif %}>
+                    {{ cam }}
+                </label>
+                {% endfor %}
+            </div>
+        </div>
 
-<button id="toggle-panel-btn" class="btn-toggle-fixed">☰</button>
-<div class="main-layout">
-    <div class="table-wrapper" id="table-wrapper">
-        <div class="per-page-selector top">
-            <label>Строк на странице:</label>
-            <select id="per-page">
-                <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
-                <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
-                <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
-                <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+        <div class="filter-group">
+            <label>Типы нарушений:</label>
+            <div class="check-group">
+                <label><input type="checkbox" name="violation_type" value="no_helmet" {% if filters.violation_type and 'no_helmet' in filters.violation_type %}checked{% endif %}> Без каски</label>
+                <label><input type="checkbox" name="violation_type" value="no_vest" {% if filters.violation_type and 'no_vest' in filters.violation_type %}checked{% endif %}> Без жилета</label>
+                <label><input type="checkbox" name="violation_type" value="no_gloves" {% if filters.violation_type and 'no_gloves' in filters.violation_type %}checked{% endif %}> Без перчаток</label>
+            </div>
+        </div>
+
+        <div class="filter-group">
+            <label>Дата с:</label>
+            <input type="date" name="date_from" value="{{ filters.start_date or '' }}">
+            <label>по:</label>
+            <input type="date" name="date_to" value="{{ filters.end_date or '' }}">
+        </div>
+
+        <div class="filter-group">
+            <label>Время с:</label>
+            <input type="time" name="time_from" value="{{ filters.start_time or '' }}">
+            <label>по:</label>
+            <input type="time" name="time_to" value="{{ filters.end_time or '' }}">
+        </div>
+
+        <div class="filter-group">
+            <label>
+                Вероятность:
+                <span id="min-val">{{ (filters.min_confidence or 0) * 100 }}</span>% –
+                <span id="max-val">{{ (filters.max_confidence or 100) * 100 }}</span>%
+            </label>
+            <div class="range-slider">
+                <input type="range" name="min_confidence" id="min-conf" min="0" max="100" step="1" value="{{ (filters.min_confidence or 0) * 100 }}">
+                <input type="range" name="max_confidence" id="max-conf" min="0" max="100" step="1" value="{{ (filters.max_confidence or 100) * 100 }}">
+            </div>
+        </div>
+
+        <div class="filter-group">
+            <label>Сортировать по:</label>
+            <select name="sort_by">
+                <option value="date" {{ 'selected' if filters.sort_by == 'date' else '' }}>Дата</option>
+                <option value="time" {{ 'selected' if filters.sort_by == 'time' else '' }}>Время</option>
+                <option value="confidence" {{ 'selected' if filters.sort_by == 'confidence' else '' }}>Вероятность</option>
+            </select>
+            <select name="sort_order">
+                <option value="DESC" {{ 'selected' if filters.sort_order == 'DESC' else '' }}>По убыванию</option>
+                <option value="ASC" {{ 'selected' if filters.sort_order == 'ASC' else '' }}>По возрастанию</option>
             </select>
         </div>
-       <div class="table-scroll-container">
-        <table class="violations-table">
-            <thead>
-                <tr>
-                    <th>Дата</th>
-                    <th>Время</th>
-                    <th>ID нарушителя</th>
-                    <th>Тип нарушения</th>
-                    <th>Вероятность</th>
-                    <th>ID камеры</th>
-                    <th>Путь к скриншоту</th>
-                </tr>
-            </thead>
-                <tbody id="violations-tbody">
-                    {% for v in violations %}
-                    <tr data-camera="{{ v.camera_id }}" data-type="{{ v.violation_type }}">
-                        <td>{{ v.date }}</td>
-                        <td>{{ v.time }}</td>
-                        <td>{{ v.human_id }}</td>
-                        <td>{{ v.violation_type }}</td>
-                        <td>{{ "%.0f"|format(v.confidence * 100) }}%</td>
-                        <td>{{ v.camera_id }}</td>
-                        <td>
-                            <a href="/{{ v.screenshot_path }}" target="_blank">
-                                {{ v.screenshot_path }}
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-        </table>
-        </div>
-        <div class="pagination-panel bottom">
-            <div class="pagination-controls">
-                <button id="prev-page" {% if page <= 1 %}disabled{% endif %}>←</button>
-                <span id="page-info">{{ page }} из {{ total_pages }}</span>
-                <button id="next-page" {% if page >= total_pages %}disabled{% endif %}>→</button>
-            </div>
-            <button id="refresh-btn" class="refresh-btn">
-                <img src="{{ url_for('static', filename='icons/refresh_icn.png') }}" alt="Обновить" style="width: 18px; height: 18px;">
-            </button>
-        </div>
-    </div>
 
-    <div class="right-panel" id="right-panel">
-
-        <div class="filter-section">
-            <h3>Фильтровать</h3>
-
-            <div class="filter-group">
-                <label>По камере:</label>
-                <div class="dropdown-checkbox">
-                    <button type="button" class="dropdown-btn" id="camera-dropdown-btn">
-                        Выбрать камеры <span class="arrow">▼</span>
-                    </button>
-                    <div class="dropdown-content" id="camera-dropdown">
-                        <label><input type="checkbox" value="rtsp://localhost:8554/stream1" checked> rtsp://localhost:8554/stream1</label>
-                        <label><input type="checkbox" value="rtsp://localhost:8554/stream2" checked> rtsp://localhost:8554/stream2</label>
-                        <label><input type="checkbox" value="rtsp://localhost:8554/stream3" checked> rtsp://localhost:8554/stream3</label>
-                        <label><input type="checkbox" value="rtsp://localhost:8554/stream4" checked> rtsp://localhost:8554/stream4</label>
-
-                        <label>
-                            <input type="checkbox" checked id="other-cameras-checkbox">
-                            Другое (веб-камера, видео и т.д.)
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <div class="filter-group">
-                <label>По нарушению:</label>
-                <div class="dropdown-checkbox">
-                    <button type="button" class="dropdown-btn" id="violation-dropdown-btn">
-                        Выбрать нарушения <span class="arrow">▼</span>
-                    </button>
-                    <div class="dropdown-content" id="violation-dropdown">
-                        <label><input type="checkbox" value="Без каски" checked> Без каски</label>
-                        <label><input type="checkbox" value="Без жилета" checked> Без жилета</label>
-                        <label><input type="checkbox" value="Без перчаток" checked> Без перчаток</label>
-                    </div>
-                </div>
-            </div>
-
-
-            <div class="filter-group date-range-group">
-                <label>Диапазон дат:</label>
-                <div class="date-range-row">
-                    <input type="date" id="date-from" value="2026-03-29" class="date-input">
-                    <span>—</span>
-                    <input type="date" id="date-to" value="2026-04-29" class="date-input">
-                </div>
-            </div>
-
-            <div class="filter-group time-range-group">
-                <label>Диапазон времени:</label>
-                <div class="time-range-row">
-                    <input type="time" id="time-from" value="00:00">
-                    <span>—</span>
-                    <input type="time" id="time-to" value="23:59">
-                </div>
-            </div>
-
-            <div class="filter-group">
-                <label>Вероятность:</label>
-                <div class="range-slider">
-                    <span id="prob-min-value">0</span>%
-                    <input type="range" id="prob-min" min="0" max="100" value="0">
-                    <input type="range" id="prob-max" min="0" max="100" value="100">
-                    <span id="prob-max-value">100</span>%
-                </div>
-            </div>
+        <div class="filter-group">
+            <label>Строк на странице:</label>
+            <select name="per_page">
+                <option value="10" {{ 'selected' if per_page == 10 else '' }}>10</option>
+                <option value="25" {{ 'selected' if per_page == 25 else '' }}>25</option>
+                <option value="50" {{ 'selected' if per_page == 50 else '' }}>50</option>
+                <option value="100" {{ 'selected' if per_page == 100 else '' }}>100</option>
+            </select>
         </div>
 
-        <div class="filter-section">
-            <h3>Сортировать</h3>
-
-            <div class="filter-group sort-group">
-
-                <div class="dropdown-checkbox custom-select" id="sort-field-wrapper">
-                    <button type="button" class="dropdown-btn" id="sort-field-btn">
-                        <span id="sort-field-text">Дата</span>
-                        <span class="arrow">▼</span>
-                    </button>
-
-                    <div class="dropdown-content" id="sort-field-dropdown">
-
-                        <label data-value="date">
-                            Дата
-                        </label>
-
-                        <label data-value="time">
-                            Время
-                        </label>
-
-                        <label data-value="confidence">
-                            Вероятность
-                        </label>
-
-                    </div>
-
-                    <input type="hidden" id="sort-field" value="date">
-                </div>
-
-
-                <div class="dropdown-checkbox custom-select" id="sort-order-wrapper">
-                    <button type="button" class="dropdown-btn" id="sort-order-btn">
-                        <span id="sort-order-text">По убыванию</span>
-                        <span class="arrow">▼</span>
-                    </button>
-
-                    <div class="dropdown-content" id="sort-order-dropdown">
-
-                        <label data-value="DESC">
-                            По убыванию
-                        </label>
-
-                        <label data-value="ASC">
-                            По возрастанию
-                        </label>
-
-                    </div>
-
-                    <input type="hidden" id="sort-order" value="DESC">
-                </div>
-
-            </div>
+        <div class="filter-actions">
+            <button type="submit">Применить</button>
+            <button type="reset" id="reset-btn">Сбросить</button>
         </div>
-
-
-        <div class="filter-buttons">
-            <button id="apply-filters" class="btn-primary">Применить</button>
-            <button id="reset-filters" class="btn-secondary">Сбросить</button>
-        </div>
-    </div>
+    </form>
 </div>
-<script src="{{ url_for('static', filename='js/journal.js') }}"></script>
-<script>
 
-    document.getElementById('per-page').addEventListener('change', function() {
-        window.location.href = "{{ url_for('journal') }}?per_page=" + this.value + "&" + new URLSearchParams(window.location.search).toString();
+{% if violations %}
+<div class="table-container">
+    <table class="violations-table">
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Время</th>
+                <th>ID нарушителя</th>
+                <th>Тип нарушения</th>
+                <th>Вероятность</th>
+                <th>ID камеры</th>
+                <th>Скриншот</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for v in violations %}
+            <tr>
+                <td>{{ v.date }}</td>
+                <td>{{ v.time }}</td>
+                <td>{{ v.human_id }}</td>
+                <td>
+                    {% if v.violation_type == 'no_helmet' %}Без каски
+                    {% elif v.violation_type == 'no_vest' %}Без жилета
+                    {% elif v.violation_type == 'no_gloves' %}Без перчаток
+                    {% else %}{{ v.violation_type }}
+                    {% endif %}
+                </td>
+                <td>{{ "%.0f"|format(v.confidence * 100) }}%</td>
+                <td>{{ v.camera_id }}</td>
+                <td>
+                    {% if v.screenshot_path %}
+                    <a href="{{ url_for('serve_violation', filename=v.screenshot_path) }}" target="_blank">Показать</a>
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination">
+    {% if page > 1 %}
+    <a href="{{ url_for('journal', page=page-1, **request.args) }}">← Назад</a>
+    {% endif %}
+    <span>Страница {{ page }} из {{ total_pages }}</span>
+    {% if page < total_pages %}
+    <a href="{{ url_for('journal', page=page+1, **request.args) }}">Вперёд →</a>
+    {% endif %}
+</div>
+{% else %}
+<div class="no-data-message">
+    <p>Нет данных для отображения</p>
+    <p class="no-data-hint">Попробуйте изменить параметры фильтрации или проверьте наличие нарушений в системе.</p>
+</div>
+{% endif %}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const minSlider = document.getElementById('min-conf');
+        const maxSlider = document.getElementById('max-conf');
+        const minSpan = document.getElementById('min-val');
+        const maxSpan = document.getElementById('max-val');
+
+        function updateLabels() {
+            let min = parseInt(minSlider.value);
+            let max = parseInt(maxSlider.value);
+            if (min > max) { minSlider.value = max; min = max; }
+            if (max < min) { maxSlider.value = min; max = min; }
+            minSpan.innerText = min;
+            maxSpan.innerText = max;
+        }
+
+        minSlider.addEventListener('input', function () {
+            if (parseInt(minSlider.value) > parseInt(maxSlider.value)) maxSlider.value = minSlider.value;
+            updateLabels();
+        });
+        maxSlider.addEventListener('input', function () {
+            if (parseInt(maxSlider.value) < parseInt(minSlider.value)) minSlider.value = maxSlider.value;
+            updateLabels();
+        });
+        updateLabels();
+
+        const resetBtn = document.getElementById('reset-btn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                window.location.href = window.location.pathname;
+            });
+        }
     });
 </script>
 {% endblock %}
