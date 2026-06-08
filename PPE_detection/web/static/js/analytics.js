@@ -121,7 +121,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!typesResponse.ok) throw new Error(`HTTP ${typesResponse.status}`);
             const typesData = await typesResponse.json();
             console.log("Типы данных:", typesData);
+            const selectedViolationNames = Array.from(
+                document.querySelectorAll('#violation-dropdown input:checked')
+            ).map(cb => cb.value);
 
+            const filteredTypesData = typesData.filter(item =>
+                selectedViolationNames.includes(item.type)
+            );
             const ctxTypes = document.getElementById('chart-types');
             if (!ctxTypes) {
                 console.error("Canvas chart-types не найден");
@@ -129,16 +135,16 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             const ctx = ctxTypes.getContext('2d');
             if (window.typesChart) window.typesChart.destroy();
-            if (!typesData || typesData.length === 0) {
+            if (!filteredTypesData || filteredTypesData.length === 0) {
                 showNoData('chart-types', 'Нет данных по типам нарушений');
             } else {
                 hideNoData('chart-types');
        window.typesChart = new Chart(ctx, {
             type: 'pie',
             data: {
-                labels: typesData.map(i => i.type),
+                labels: filteredTypesData.map(i => i.type),
                 datasets: [{
-                    data: typesData.map(i => i.count),
+                    data: filteredTypesData.map(i => i.count),
                     backgroundColor: ['#E677FF', '#7C79FC', '#7DCFFF'],
                     borderColor: 'transparent'
                 }]
@@ -190,7 +196,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                         anchor: 'end',
                         align: 'end',
-                        offset: 12,
+                        offset: 0.5,
 
                         clamp: true
                     }
@@ -232,6 +238,23 @@ document.addEventListener('DOMContentLoaded', function () {
                     .find(([key, value]) => value === cb.value);
                 return entry ? entry[0] : cb.value;
             });
+            if (selectedViolations.length === 0) {
+
+            if (window.typesChart) {
+                window.typesChart.destroy();
+                window.typesChart = null;
+            }
+
+            if (window.dailyChart) {
+                window.dailyChart.destroy();
+                window.dailyChart = null;
+            }
+
+            showNoData('chart-types', 'Не выбрано ни одного нарушения');
+            showNoData('chart-daily', 'Не выбрано ни одного нарушения');
+
+            return;
+        }
             const datasets = [];
 
             if (selectedViolations.includes('no_helmet')) {
@@ -754,7 +777,7 @@ function openChartInModal(originalChart) {
                     },
                     anchor: 'end',
                     align: 'end',
-                    offset: 12,
+                    offset: 0.5,
                     clamp: true
                 }
             }
