@@ -572,22 +572,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
         noDataDiv = document.createElement('div');
         noDataDiv.className = 'no-data-message';
-        noDataDiv.style.cssText = `
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #888;
-            font-size: 18px;
-            font-weight: 500;
-            text-align: center;
-            pointer-events: none;
-        `;
-        noDataDiv.textContent = message;
+
+
+        let displayMessage = message;
+        if (window.innerWidth < 500 && message.length > 30) {
+
+            const midPoint = message.indexOf(' ', 20);
+            if (midPoint > 0) {
+                displayMessage = message.substring(0, midPoint) + '<br>' + message.substring(midPoint + 1);
+            }
+        }
+
+        noDataDiv.innerHTML = displayMessage;
+
 
         parent.style.position = 'relative';
         parent.appendChild(noDataDiv);
         canvas.style.display = 'none';
+
+
+        console.log(`ShowNoData: ${canvasId}, message: ${message}, parent height: ${parent.clientHeight}`);
     }
 
     function hideNoData(canvasId) {
